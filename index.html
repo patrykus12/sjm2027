@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ski Jumping Manager 2027</title>
+  <link rel="stylesheet" href="css/style.css">
+<meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="SJM 2027">
+  <meta name="theme-color" content="#0d141c">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+</head>
+<body>
+  <div id="start" class="hidden"></div>
+  <div id="app" class="hidden">
+    <aside id="sidebar"></aside>
+    <div id="drawer-bg" data-act="drawer"></div>
+    <div id="content">
+      <header id="topbar"></header>
+      <main id="main"></main>
+    </div>
+  </div>
+  <div id="modal" class="hidden"></div>
+  <div id="toast"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/realdb.js"></script>
+  <script src="js/realextra.js"></script>
+  <script src="js/realelo.js"></script>
+<script src="js/realpodium.js"></script>
+<script src="js/realglobes.js"></script>
+<script src="js/realtitles.js"></script>
+<script src="js/realmedals.js"></script>
+  <script src="js/realstaff.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/traits.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/manager.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/live.js"></script>
+  <script src="js/main.js"></script>
+  <script>if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
