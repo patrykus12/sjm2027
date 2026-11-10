@@ -34,7 +34,7 @@ SJM.CAL = (function () {
   ];
   // impreza mistrzowska w tygodniu bigIf (rok zakończenia sezonu E)
   function bigOf(t, E) {
-    if (t.bigIf === 'SFWC') return E % 4 === 0 ? 'SFWC' : null;
+    if (t.bigIf === 'SFWC') return E % 2 === 0 ? 'SFWC' : null;
     if (t.bigIf === 'WCH_OWG') return E % 4 === 2 ? 'OWG' : E % 2 === 1 ? 'WCH' : null;
     return null;
   }
@@ -132,7 +132,7 @@ SJM.CAL = (function () {
     const add = (id) => { const h = id && SJM.W.getHill(id); if (h) cities.add(h.city); };
     if (E % 4 === 2) { const v = hostOf('OWG', E); add(v.nh); add(v.lh); }
     if (E % 2 === 1) { const v = hostOf('WCH', E); add(v.nh); add(v.lh); }
-    if (E % 4 === 0) add(hostOf('SFWC', E).hill);
+    if (E % 2 === 0) add(hostOf('SFWC', E).hill);
     return cities;
   }
 
@@ -302,7 +302,7 @@ SJM.CAL = (function () {
   // IO: gospodarz kolejnych igrzysk ogłaszany po poprzednich; MŚ i MŚ w lotach: decyzja FIS 4 lata przed imprezą
   const BIG_NAMES = { OWG: 'Igrzyska Olimpijskie', WCH: 'Mistrzostwa Świata', SFWC: 'MŚ w lotach' };
   const FIS_AHEAD = 4;
-  const isEdition = (kind, y) => (kind === 'WCH' ? y % 2 === 1 : kind === 'OWG' ? y % 4 === 2 : y % 4 === 0);
+  const isEdition = (kind, y) => (kind === 'WCH' ? y % 2 === 1 : kind === 'OWG' ? y % 4 === 2 : y % 2 === 0); // MŚ w lotach co 2 lata (lata parzyste)
   const S = () => SJM.state;
   const curE = () => S().season + 1;
   function nextEdition(kind, from) { let y = from; while (!isEdition(kind, y)) y++; return y; }

@@ -18,9 +18,20 @@ SJM.M = (function () {
     if (!s) return;
     W.syncNations(s);
     if (s.standings) { s.standings.sgp = s.standings.sgp || {}; s.standings.scoc = s.standings.scoc || {}; }
+    // Puchar Narodów LGP (starsze zapisy): odtworzony z rozegranych konkursów LGP
+    if (s.standings && !s.standings.snc) {
+      const snc = (s.standings.snc = {});
+      for (const ev of ((s.calendar && s.calendar.weeks) || []).flatMap((w) => w.events)) {
+        const r = s.results && s.results[ev.id];
+        if (ev.level !== 'SGP' || !r || !r.ranking) continue;
+        if (r.type === 'team') r.ranking.forEach((x) => { if (x.rank && x.rank <= 8) snc[x.nat] = (snc[x.nat] || 0) + SJM.TEAM_POINTS[x.rank - 1]; });
+        else r.ranking.forEach((x) => { const n = (s.jumpers[x.id] || {}).nation; if (n && x.rank && x.rank <= 30) snc[n] = (snc[n] || 0) + SJM.WC_POINTS[x.rank - 1]; });
+      }
+    }
     // kwota PK: premia za okres FIS Cup liczona ponad minimum (starsze zapisy mogły ją stracić w minimum)
     for (const n of Object.values(s.nations || {})) {
       const q = n.quota;
+      if (q) q.FIS = QUOTA_RULES.fisQuota; // FIS Cup: stała kwota 10 (starsze zapisy miały 6–10)
       if (q && q.crl !== undefined && q.fisB) q.COC = Math.max(q.COC, Math.min(QUOTA_RULES.maxCOC, Math.max(q.crl, QUOTA_RULES.minCOC) + q.fisB));
     }
     // rankingi kroczące (kwoty wg FIS): punkty rozłożone na okresy odtworzone z sum sezonowych
@@ -37,6 +48,13 @@ SJM.M = (function () {
       }
       computePeriodQuotas(currentPeriod());
     }
+    // miejsce za medal MŚJ (starsze zapisy): medaliści odtworzeni z medali bieżącego sezonu
+    if (s.wjcQuota && !s.wjcQuota.ids) {
+      s.wjcQuota.ids = {};
+      if (s.wjcQuota.season === s.season) for (const m of s.seasonMedals || []) if (m.level === 'WJC' && m.ids && m.ids.length === 1) (s.wjcQuota.ids[m.nat] = s.wjcQuota.ids[m.nat] || []).push(m.ids[0]);
+    }
+    // dożywotnie uprawnienia (starsze zapisy): odtworzone z punktów poprzedniego sezonu
+    for (const j of Object.values(s.jumpers || {})) if (!j.life) updateLife(j);
     // podia w PŚ sprzed gry (zapisy sprzed js/realpodium.js): prawdziwe liczby dochodzą do wyników z gry
     if (s.realDB) {
       for (const j of Object.values(s.jumpers)) {
@@ -171,10 +189,10 @@ SJM.M = (function () {
   //     okresu PK (maks. 1 na kraj, miejsce przechodzi dalej) i +1 za medal indywidualny MŚJ; maks. 7. Gospodarz +4 (grupa krajowa).
   // PK (ranking kontynentalny: PK + LPK): top 50 z limitem 6 na kraj, +1 za każdego zawodnika w top 3 klasyfikacji ostatniego
   //     okresu FIS Cup (kraj z kwotą 7 – miejsce przechodzi dalej); maks. 7; każdy kraj może wystawić co najmniej 4. Gospodarz +6.
-  // FIS Cup (ranking kroczący FIS Cup): 6 + 1 za każdego zawodnika w top 40 (maks. +4), czyli 6–10. Gospodarz +4.
+  // FIS Cup: każdy kraj ma stałą kwotę 10 (bez premii za ranking i bez dodatku dla gospodarza).
   // Lato: LGP – kwota jak w PŚ, LPK – jak w PK.
-  const HOST_BONUS = { WC: 4, COC: 6, FIS: 4, SGP: 4, SCOC: 6 };
-  const QUOTA_RULES = { wrlTop: 45, wrlPerNation: 5, crlTop: 50, crlPerNation: 6, fisTop: 40, fisPerNation: 4, maxWC: 7, maxCOC: 7, minCOC: 4, basicWC: 2, baseFIS: 6, periodTop: 3 };
+  const HOST_BONUS = { WC: 4, COC: 6, FIS: 0, SGP: 4, SCOC: 6 };
+  const QUOTA_RULES = { wrlTop: 45, wrlPerNation: 5, crlTop: 50, crlPerNation: 6, fisTop: 40, fisPerNation: 4, maxWC: 7, maxCOC: 7, minCOC: 4, basicWC: 2, baseFIS: 6, fisQuota: 10, periodTop: 3 };
   const TEAM_MIN = 4; // minimalna kwota w weekend z konkursem drużynowym
   const PCUP = { WC: 'WC', SGP: 'WC', COC: 'COC', SCOC: 'COC', FIS: 'FIS' }; // cykl → ranking kroczący
   const blankPP = () => ({ WC: [0, 0, 0, 0], COC: [0, 0, 0, 0], FIS: [0, 0, 0, 0] });
@@ -266,7 +284,7 @@ SJM.M = (function () {
       const wc = Math.min(R.maxWC, baseWC[c] + cocB);
       const fisB = fisBon.got[c] || 0;
       const coc = Math.min(R.maxCOC, baseCOC[c] + fisB);
-      const fc = R.baseFIS + (fis[c] || 0);
+      const fc = R.fisQuota;
       const prev = s.nations[c].quota || {};
       s.nations[c].quota = { WC: wc, COC: coc, FIS: fc, wrl: a, add, basic, hadPts, cocB, wjcB, crl: crl[c] || 0, fisB, fisTop: fis[c] || 0, period: k, prevWC: prev.WC, prevCOC: prev.COC, prevFIS: prev.FIS };
     }
@@ -287,9 +305,11 @@ SJM.M = (function () {
     return list;
   }
   // MŚJ: medal indywidualny = +1 miejsce w PŚ dla kraju (do kolejnych MŚJ)
-  function wjcQuotaBonus(nat) {
+  function wjcQuotaBonus(nat, id) {
     const s = st();
-    if (!s.wjcQuota || s.wjcQuota.season !== s.season) s.wjcQuota = { season: s.season, nats: [] };
+    if (!s.wjcQuota || s.wjcQuota.season !== s.season) s.wjcQuota = { season: s.season, nats: [], ids: {} };
+    // medalista (także po ukończeniu 20 lat) może zająć miejsce premiowe – obok innych juniorów
+    if (id) { s.wjcQuota.ids = s.wjcQuota.ids || {}; const l = (s.wjcQuota.ids[nat] = s.wjcQuota.ids[nat] || []); if (!l.includes(id)) l.push(id); }
     if (s.wjcQuota.nats.includes(nat)) return;
     s.wjcQuota.nats.push(nat);
     const q = s.nations[nat].quota;
@@ -507,8 +527,71 @@ SJM.M = (function () {
     const s = st(), t = ((s.titles || {})[ev.level] || {})[titleKey(ev)];
     return t && t.season < s.season && s.jumpers[t.id] ? t.id : null;
   }
+  // grupa krajowa (PŚ, LGP): w sezonie tylko w 2 konkursach indywidualnych na skoczniach gospodarza.
+  // Albo cały weekend (2 konkursy), albo pierwszy konkurs jednego weekendu i pierwszy konkurs innego weekendu u siebie
+  // (np. weekend z drużynówką i jednym konkursem indywidualnym zużywa 1). Gracz wybiera w Zgłoszeniach, w których weekendach
+  // ją wykorzystać (s.ngPick: { season, WC: { indeks tygodnia: 0–2 }, SGP: {...} }); bez wyboru i u AI – w kolejności kalendarza.
+  const NG_LIMIT = 2;
+  const homeInd = (w, level, nat) => w.events.filter((e) => e.level === level && e.format === 'ind' && hostNationOf(e.hill) === nat);
+  function ngPicks(level, nat) {
+    const s = st();
+    return nat === s.nation && s.ngPick && s.ngPick.season === s.season ? s.ngPick[level] || {} : {};
+  }
+  // przydział w kolejnych tygodniach: { wi: liczba konkursów z grupą krajową }
+  function ngAlloc(level, nat) {
+    const pick = ngPicks(level, nat), out = {};
+    let left = NG_LIMIT;
+    ((st().calendar && st().calendar.weeks) || []).forEach((w, wi) => {
+      const n = homeInd(w, level, nat).length;
+      if (!n || left <= 0) return;
+      // w innym weekendzie niż pierwszy wykorzystany – tylko pierwszy konkurs (pozostała 1)
+      const k = Math.min(left, n, wi in pick ? pick[wi] : Infinity);
+      if (k > 0) { out[wi] = k; left -= k; }
+    });
+    return out;
+  }
+  function nationalGroupEvents(level, nat) {
+    const out = new Set(), weeks = (st().calendar && st().calendar.weeks) || [];
+    for (const [wi, k] of Object.entries(ngAlloc(level, nat))) homeInd(weeks[wi], level, nat).slice(0, k).forEach((e) => out.add(e.id));
+    return out;
+  }
+  // wybór gracza dla bieżącego tygodnia: ile konkursów można objąć grupą krajową (max) i ile jest teraz (cur)
+  function nationalGroupChoice(level) {
+    const s = st(), w = currentWeek(), n = w ? homeInd(w, level, s.nation).length : 0;
+    if (!n || (level !== 'WC' && level !== 'SGP')) return null;
+    const pick = ngPicks(level, s.nation), alloc = ngAlloc(level, s.nation);
+    let used = 0;
+    for (const [wi, k] of Object.entries(alloc)) if (+wi < s.week) used += k;
+    const max = Math.min(n, NG_LIMIT - used);
+    return { n, max, cur: alloc[s.week] || 0, chosen: s.week in pick, used };
+  }
+  function setNationalGroup(level, k) {
+    const s = st(), c = nationalGroupChoice(level);
+    if (!c || ensureNominations().confirmed) return false;
+    if (!s.ngPick || s.ngPick.season !== s.season) s.ngPick = { season: s.season };
+    (s.ngPick[level] = s.ngPick[level] || {})[s.week] = U.clamp(Math.round(k), 0, c.max);
+    return true;
+  }
+  function hasNationalGroup(ev, nat) {
+    return (ev.level === 'WC' || ev.level === 'SGP') && ev.format === 'ind' && nationalGroupEvents(ev.level, nat).has(ev.id);
+  }
+  // dodatek gospodarza w weekendzie (PŚ/LGP: tylko gdy w którymś konkursie weekendu przysługuje grupa krajowa)
+  function hostBonusIn(level, nat, week) {
+    if (level === 'WC' || level === 'SGP') { const ng = nationalGroupEvents(level, nat); return week.events.some((e) => ng.has(e.id)); }
+    return week.events.some((e) => e.level === level && hostNationOf(e.hill) === nat);
+  }
   // skład kraju w konkursie indywidualnym MŚ / MŚ w lotach: 4 + obrońca tytułu tego konkursu
-  function startersFor(ev, ids) {
+  // (PŚ/LGP u siebie: w konkursie bez grupy krajowej – tylko zwykła kwota, najlepsi ze zgłoszonych)
+  function startersFor(ev, ids, nat, week) {
+    if (nat && week && ev.format === 'ind' && (ev.level === 'WC' || ev.level === 'SGP') && hostBonusIn(ev.level, nat, week) && !hasNationalGroup(ev, nat)) {
+      const base = st().nations[nat].quota.WC;
+      if (ids.length > base) {
+        const cup = CUP_KEY[ev.level];
+        const sc = (id) => { const j = st().jumpers[id]; return (st().standings[cup][id] || 0) * 10 + (j ? W.overall(j) + j.form * 0.5 : 0); };
+        const keep = new Set(ids.slice().sort((a, b) => sc(b) - sc(a)).slice(0, base));
+        ids = ids.filter((id) => keep.has(id));
+      }
+    }
     if (ev.format !== 'ind' || !['WCH', 'SFWC'].includes(ev.level)) return ids;
     const d = defenderOf(ev), others = ids.filter((id) => id !== d).slice(0, 4);
     return d && ids.includes(d) ? [d, ...others] : others;
@@ -551,7 +634,7 @@ SJM.M = (function () {
   function quotaFor(level, nat, week) {
     const s = st();
     const q = s.nations[nat].quota;
-    const hostBonus = week.events.some((e) => e.level === level && hostNationOf(e.hill) === nat);
+    const hostBonus = hostBonusIn(level, nat, week);
     // konkurs drużynowy w programie weekendu: kraj z kwotą poniżej 4 może zgłosić 4 zawodników (art. 4.2.4)
     const teamMin = week.events.some((e) => e.level === level && e.format === 'team') ? TEAM_MIN : 0;
     switch (level) {
@@ -559,7 +642,7 @@ SJM.M = (function () {
       case 'SGP': return Math.max(teamMin, q.WC + (hostBonus ? HOST_BONUS.SGP : 0));
       case 'COC': return q.COC + (hostBonus ? HOST_BONUS.COC : 0);
       case 'SCOC': return q.COC + (hostBonus ? HOST_BONUS.SCOC : 0);
-      case 'FIS': return q.FIS + (hostBonus ? HOST_BONUS.FIS : 0);
+      case 'FIS': return QUOTA_RULES.fisQuota;
       case 'OWG': { const o = s.olyQuota; return o && o.year === owgYear() ? o.nats[nat] || 0 : 0; }
       case 'WCH': case 'SFWC': return 4 + titleHolders(level, nat).length;
       case 'WJC': return 4;
@@ -568,14 +651,51 @@ SJM.M = (function () {
     return 0;
   }
 
+  // miejsce za medal MŚJ: tylko dla medalisty albo innego juniora (U-20). Zwraca limit „zwykłych” zawodników
+  // i test, kto może zająć miejsce MŚJ; null – brak ograniczenia (brak premii, inny cykl, albo i tak wolno zgłosić 4 do drużynówki)
+  function wjcReserve(level, nat, week) {
+    if (level !== 'WC' && level !== 'SGP') return null;
+    const s = st(), q = s.nations[nat].quota;
+    if (!q || !q.wjcB) return null;
+    const total = quotaFor(level, nat, week);
+    const host = hostBonusIn(level, nat, week) ? HOST_BONUS[level] : 0;
+    const teamMin = week.events.some((e) => e.level === level && e.format === 'team') ? TEAM_MIN : 0;
+    const others = Math.max(teamMin, q.WC - q.wjcB + host);
+    if (others >= total) return null;
+    const medal = (s.wjcQuota && s.wjcQuota.ids && s.wjcQuota.ids[nat]) || [];
+    return { others, total, ok: (j) => isJunior(j) || medal.includes(j.id), medal };
+  }
+  // wybór z uporządkowanej listy z poszanowaniem miejsca MŚJ
+  function fitWjc(level, nat, week, ids, q) {
+    const r = wjcReserve(level, nat, week), s = st();
+    if (!r) return ids.slice(0, q);
+    const out = []; let others = 0;
+    for (const id of ids) {
+      if (out.length >= q) break;
+      const j = s.jumpers[id];
+      if (j && r.ok(j)) out.push(id);
+      else if (others < r.others) { out.push(id); others++; }
+    }
+    return out;
+  }
+
   // ---------- Uprawnienia do startu (punkty z bieżącego lub poprzedniego sezonu) ----------
   function hasPoints(j, cup) { return pointsOf(j, cup, 'prev') > 0 || pointsOf(j, cup, 'cur') > 0 || !!(j.lic && j.lic[cup]); }
   // punkty letnie liczą się jak zimowe: LGP jak PŚ, LPK jak PK
+  // dożywotnie uprawnienia: punkty PŚ/LGP kiedykolwiek → PŚ/LGP, punkty PK/LPK kiedykolwiek → PK/LPK
+  function lifeLic(j, cup) {
+    if (j.life && j.life[cup]) return true;
+    return cup === 'WC' ? pointsOf(j, 'WC', 'cur') > 0 || pointsOf(j, 'SGP', 'cur') > 0 : pointsOf(j, 'COC', 'cur') > 0 || pointsOf(j, 'SCOC', 'cur') > 0;
+  }
+  function updateLife(j) {
+    const p = j.prevPts || {}, l = j.lic || {};
+    j.life = { WC: !!((j.life && j.life.WC) || p.WC > 0 || p.SGP > 0 || l.WC), COC: !!((j.life && j.life.COC) || p.COC > 0 || p.SCOC > 0 || l.COC) };
+  }
   function licenseFor(j, level) {
-    const top = hasPoints(j, 'WC') || hasPoints(j, 'SGP') || hasPoints(j, 'COC') || hasPoints(j, 'SCOC');
+    const top = hasPoints(j, 'WC') || hasPoints(j, 'SGP') || hasPoints(j, 'COC') || hasPoints(j, 'SCOC') || lifeLic(j, 'WC');
     switch (level) {
       case 'WC': case 'SGP': case 'WCH': case 'OWG': case 'SFWC': return top;
-      case 'COC': case 'SCOC': return top || hasPoints(j, 'FIS');
+      case 'COC': case 'SCOC': return top || hasPoints(j, 'FIS') || lifeLic(j, 'COC');
       default: return true;
     }
   }
@@ -713,16 +833,12 @@ SJM.M = (function () {
           // kadra A jedzie na FIS Cup tylko po punkty dające uprawnienia do PK (inaczej zawodnik bez punktów nie startowałby nigdzie)
           cand = cand.filter((j) => j.group !== 'A' || !licenseFor(j, 'COC'));
           const host = week.events.some((e) => e.level === 'FIS' && hostNationOf(e.hill) === nat);
-          cand = cand.slice(0, (AI_FIS_SQUAD[nat] || (st().dormant && st().dormant[nat] ? 3 : 1)) + (host ? HOST_BONUS.FIS : 0));
+          cand = cand.slice(0, (AI_FIS_SQUAD[nat] || (st().dormant && st().dormant[nat] ? 3 : 1)) + (host ? 4 : 0)); // u siebie gospodarz wystawia więcej (w ramach kwoty 10)
         }
-        // latem kadra PŚ startuje w LGP, nie w Letnim PK (LPK i LGP są zwykle w różne weekendy)
-        if (lv === 'SCOC') {
-          const core = new Set(pool.filter((j) => eligible(j, 'WC')).slice(0, st().nations[nat].quota.WC).map((j) => j.id));
-          cand = cand.filter((j) => !core.has(j.id));
-        }
+        // Letni PK i letni FIS Cup jak zimą: kto nie jedzie na LGP w tym tygodniu, może skakać w LPK
         if (lv === 'WJC') cand = cand.filter((j) => j.group !== 'A' || W.overall(j) < 85);
       }
-      const chosen = cand.slice(0, q);
+      const chosen = fitWjc(lv, nat, week, cand.map((j) => j.id), q).map((id) => st().jumpers[id]);
       chosen.forEach((j) => used.add(j.id));
       out[lv] = chosen.map((j) => j.id);
     }
@@ -797,15 +913,15 @@ SJM.M = (function () {
     const staff = s.player.staff[DELEGABLE[lv]];
     const cq = staff ? staff.quality : 25;
     const pref = { SGP: ['A', 'B', 'R', 'J'], COC: ['B', 'A', 'R', 'J'], SCOC: ['B', 'A', 'R', 'J'], FIS: ['J', 'R', 'B', 'A'], WJC: ['J', 'R', 'B', 'A'], NAT: ['A', 'B', 'J', 'R'] }[lv];
-    // trener juniorów nie sięga po kadrę A do FIS Cup, a trener kadry B – do Letniego PK
-    const allowed = { FIS: ["J", "R", "B"], SCOC: ["B", "J", "R"] }[lv];
+    // trener juniorów nie sięga po kadrę A do FIS Cup (latem i zimą tak samo)
+    const allowed = { FIS: ["J", "R", "B"] }[lv];
     const cands = myJumpers().filter((j) => !used.has(j.id) && eligible(j, lv) && jumperStatus(j) !== "train" && (!allowed || allowed.includes(j.group || "R")));
     const score = (j) => {
       const g = pref.indexOf(j.group || 'R');
       return W.overall(j) + j.form * 0.5 - Math.max(0, j.fatigue - 60) * 0.1 + (g === 0 ? 3 : g === 1 ? 1 : 0)
         + (lv === 'FIS' ? (21 - W.age(j)) * 0.4 : 0) + U.gauss(0, (100 - cq) / 14);
     };
-    return cands.map((j) => [j, score(j)]).sort((a, b) => b[1] - a[1]).slice(0, q).map(([j]) => j.id);
+    return fitWjc(lv, s.nation, week, cands.map((j) => [j, score(j)]).sort((a, b) => b[1] - a[1]).map(([j]) => j.id), q);
   }
 
   function confirmNominations() {
@@ -855,7 +971,7 @@ SJM.M = (function () {
       if (isDelegated(lv)) continue;
       const q = quotaFor(lv, s.nation, week);
       const add = (prop[lv] || []).filter((id) => !taken.has(id) && jumperStatus(s.jumpers[id]) !== 'train');
-      n.byLevel[lv] = (n.byLevel[lv] || []).concat(add).slice(0, q);
+      n.byLevel[lv] = fitWjc(lv, s.nation, week, (n.byLevel[lv] || []).concat(add), q);
       n.byLevel[lv].forEach((id) => taken.add(id));
     }
   }
@@ -884,6 +1000,9 @@ SJM.M = (function () {
     n.byLevel[level] = n.byLevel[level] || [];
     const q = quotaFor(level, s.nation, week);
     if (n.byLevel[level].length >= q) return `Limit startowy (${q}) dla ${SJM.LEVELS[level].name} jest wyczerpany.`;
+    const wr = wjcReserve(level, s.nation, week);
+    if (wr && !wr.ok(j) && n.byLevel[level].filter((x) => s.jumpers[x] && !wr.ok(s.jumpers[x])).length >= wr.others)
+      return `Ostatnie wolne miejsce to premia za medal MŚJ – może je zająć tylko medalista albo inny junior (U-20).`;
     n.byLevel[level].push(id);
     return null;
   }
@@ -917,15 +1036,23 @@ SJM.M = (function () {
     const s = st();
     const week = currentWeek();
     if (!week || s.staffWindow) return;
-    const report = [];
+    // wznowienie weekendu przerwanego decyzją o składzie drużyny (kontuzja w poprzednim konkursie)
+    const run = s.weekRun && s.weekRun.week === s.week && s.weekRun.season === s.season ? s.weekRun : null;
+    if (run && run.ask && !SJM.AUTOPILOT) return 'teamChange'; // decyzja o składzie wciąż czeka
+    s.weekRun = null;
+    const report = run ? run.report : [];
     if (week.events.length) {
+      let noms, equip, start = 0;
+      const decided = run ? run.decided : {};
+      if (run) ({ noms, equip, next: start } = run);
+      else {
       // niezatwierdzone składy: trenerzy uzupełniają swoje cykle (w trybie testowym asystent wypełnia też cykle gracza)
       if (needsNominations()) { if (SJM.AUTOPILOT) assistantFill(); confirmNominations(); }
-      const noms = {};
+      noms = {};
       for (const n of SJM.NATIONS) {
         noms[n.code] = n.code === s.nation ? sanitizePlayerNoms(week) : pickForNation(n.code, week, false);
       }
-      const equip = {};
+      equip = {};
       for (const n of SJM.NATIONS) equip[n.code] = W.equipBonus(n.code);
 
       // koszty wyjazdów gracza
@@ -933,9 +1060,24 @@ SJM.M = (function () {
       for (const [lv, ids] of Object.entries(noms[s.nation])) travel += ids.length * SJM.LEVELS[lv].travel * costScale();
       if (travel) ledger('travel', -travel, 'Wyjazdy na zawody (' + week.label + ')');
 
-      for (const ev of week.events) {
+      // silny wiatr w dniu zawodów: PK / FIS Cup odwołany (wiadomo dopiero na miejscu – ekipy już dojechały)
+      const off = week.events.filter((e) => (e.level === 'COC' || e.level === 'FIS') && Math.random() < 0.02);
+      if (off.length) {
+        week.events = week.events.filter((e) => !off.includes(e));
+        for (const e of off) {
+          const t = SJM.CAL.eventTitle(e);
+          report.push(`<b>${t}</b>: <span class="warn">konkurs odwołany z powodu silnego wiatru</span>`);
+          if ((noms[s.nation][e.level] || []).length) news('Konkurs odwołany', `Ze względu na silny wiatr organizatorzy odwołali konkurs: ${t}. Zawodnicy wykorzystają czas na trening.`, 'results');
+        }
+      }
+      }
+
+      for (let k = start; k < week.events.length; k++) {
+        const ev = week.events[k];
         const entrantsIds = [];
-        for (const n of SJM.NATIONS) startersFor(ev, noms[n.code][ev.level] || []).forEach((id) => entrantsIds.push(id));
+        // kontuzjowani we wcześniejszym konkursie tego weekendu już nie startują
+        const fit = (id) => s.jumpers[id] && available(s.jumpers[id]);
+        for (const n of SJM.NATIONS) startersFor(ev, (noms[n.code][ev.level] || []).filter(fit), n.code, week).forEach((id) => entrantsIds.push(id));
         let res;
         if (ev.format === 'ind') {
           let entrants = entrantsIds.map((id) => s.jumpers[id]).filter(Boolean), cut = null;
@@ -948,20 +1090,34 @@ SJM.M = (function () {
           const fly = ev.level === 'WC' && W.getHill(ev.hill).K >= 170 && Object.keys(s.standings.flying).length ? s.standings.flying : null;
           const order = cup ? (j) => { const p = s.standings[cup][j.id] || 0; return (!p && j.nation === host ? -1000 : fly ? fly[j.id] || 0 : p) + Math.random() * 0.5; } : null;
           // TCS: system KO; remis w kwalifikacjach rozstrzyga klasyfikacja generalna PŚ
-          // Puchar Kontynentalny (zima): bez kwalifikacji – w 1. serii startują wszyscy zgłoszeni
-          res = SJM.SIM.individual(ev, entrants, { equip, qual: ['WC', 'SGP', 'SCOC', 'WCH', 'OWG', 'SFWC'].includes(ev.level), order,
-            ko: ev.tour === 'TCS', seed: (j) => s.standings.wc[j.id] || 0 });
+          // Puchar Kontynentalny (zima i lato – PK i LPK): bez kwalifikacji – w 1. serii startują wszyscy zgłoszeni
+          res = SJM.SIM.individual(ev, entrants, { equip, qual: ['WC', 'SGP', 'WCH', 'OWG', 'SFWC'].includes(ev.level), order,
+            ko: ev.tour === 'TCS', seed: (j) => s.standings.wc[j.id] || 0,
+            // upadek → możliwa kontuzja od razu: kontuzjowany nie skacze w kolejnych seriach ani konkursach weekendu
+            fallInjury: (j, r) => {
+              if (Math.random() >= 0.3 * injMult(j)) return false;
+              const overHS = r.d > W.getHill(ev.hill).HS;
+              injure(j, (overHS ? 'upadek po skoku za HS w konkursie ' : 'upadek w konkursie ') + SJM.CAL.eventTitle(ev), overHS ? 'fallHS' : 'fall');
+              return true;
+            } });
           if (cut) res.cut = cut;
         } else {
           const teams = [];
           for (const n of SJM.NATIONS) {
-            const members = teamFor(n.code, ev.level, noms[n.code][ev.level] || [], ev);
+            const members = teamFor(n.code, ev.level, (noms[n.code][ev.level] || []).filter((id) => s.jumpers[id] && available(s.jumpers[id])), ev);
             if (members) teams.push({ nation: n.code, members });
           }
-          res = SJM.SIM.team(ev, teams, { equip, nc: s.standings.nc, ncPrev: s.ncPrev });
+          // kolejność startu drużyn: w LGP wg Pucharu Narodów LGP (przed pierwszymi punktami – wg PN zimowego)
+          res = ev.level === 'SGP' ? SJM.SIM.team(ev, teams, { equip, nc: s.standings.snc, ncPrev: s.standings.nc })
+            : SJM.SIM.team(ev, teams, { equip, nc: s.standings.nc, ncPrev: s.ncPrev });
         }
         s.results[ev.id] = res;
         applyResult(ev, res, report);
+        // nasz zawodnik kontuzjowany, a był w składzie późniejszej drużynówki tego weekendu → pauza na zmianę składu
+        if (!SJM.AUTOPILOT) {
+          const ask = teamChangeNeeded(week, k, noms[s.nation], decided);
+          if (ask) { s.weekRun = { week: s.week, season: s.season, next: k + 1, report, noms, equip, decided, ask }; return 'teamChange'; }
+        }
       }
       // zmęczenie podróżą
       for (const ids of Object.values(noms).flatMap((o) => Object.values(o))) ids.forEach((id) => { const j = s.jumpers[id]; if (j) j.fatigue = U.clamp(j.fatigue + 3, 0, 100); });
@@ -988,6 +1144,50 @@ SJM.M = (function () {
     return "ok";
   }
 
+  // ---------- Zmiana składu drużyny po kontuzji (w trakcie weekendu) ----------
+  function teamChangeNeeded(week, k, myNoms, decided) {
+    const s = st();
+    for (let m = k + 1; m < week.events.length; m++) {
+      const ev = week.events[m];
+      if (ev.format === 'ind') continue;
+      const ids = myNoms[ev.level] || [];
+      const team = teamFor(s.nation, ev.level, ids.slice(), ev) || [];
+      // pytamy tylko o nowe kontuzje (o już rozpatrzone – nie)
+      const hurt = team.filter((j) => !available(j) && !(decided[ev.id] || []).includes(j.id));
+      if (hurt.length) return { eventId: ev.id, level: ev.level, injured: hurt.map((j) => j.id) };
+    }
+    return null;
+  }
+  function teamChangeInfo() {
+    const s = st(), r = s.weekRun;
+    if (!r || !r.ask) return null;
+    const ev = currentWeek().events.find((e) => e.id === r.ask.eventId);
+    if (!ev) return null;
+    const ids = r.noms[s.nation][ev.level] || [];
+    const fitIds = ids.filter((id) => s.jumpers[id] && available(s.jumpers[id]));
+    const size = SJM.SIM.teamSize(ev.format);
+    // podpowiedź: dotychczasowy skład z kontuzjowanymi zastąpionymi najlepszymi zdrowymi
+    const before = (teamFor(s.nation, ev.level, ids.slice(), ev) || []).map((j) => j.id);
+    const auto = (teamFor(s.nation, ev.level, fitIds.slice(), ev) || []).map((j) => j.id);
+    const spare = auto.filter((id) => !before.includes(id));
+    const suggested = fitIds.length >= size ? before.map((id) => (fitIds.includes(id) ? id : spare.shift())) : [];
+    return { ev, title: SJM.CAL.eventTitle(ev), size, injured: r.ask.injured, cands: fitIds, suggested };
+  }
+  // ids = nowy skład (kolejność grup) albo null – trener wybiera sam
+  function setTeamChange(ids) {
+    const s = st(), r = s.weekRun;
+    if (!r || !r.ask) return 'Brak decyzji do podjęcia.';
+    const info = teamChangeInfo();
+    if (ids) {
+      if (ids.length !== info.size || new Set(ids).size !== ids.length || ids.some((id) => !info.cands.includes(id))) return `Wybierz ${info.size} różnych, zdrowych zawodników.`;
+      s.nominations.teams = s.nominations.teams || {};
+      s.nominations.teams[info.ev.id] = ids.slice();
+    } else if (s.nominations.teams) delete s.nominations.teams[info.ev.id];
+    r.decided[info.ev.id] = (r.decided[info.ev.id] || []).concat(info.injured);
+    r.ask = null;
+    return null;
+  }
+
   function sanitizePlayerNoms(week) {
     const s = st();
     const n = ensureNominations();
@@ -995,7 +1195,7 @@ SJM.M = (function () {
     const used = new Set();
     for (const lv of weekLevels(week)) {
       const q = quotaFor(lv, s.nation, week);
-      out[lv] = (n.byLevel[lv] || []).filter((id) => s.jumpers[id] && eligible(s.jumpers[id], lv) && !used.has(id)).slice(0, q);
+      out[lv] = fitWjc(lv, s.nation, week, (n.byLevel[lv] || []).filter((id) => s.jumpers[id] && eligible(s.jumpers[id], lv) && !used.has(id)), q);
       out[lv].forEach((id) => used.add(id));
     }
     return out;
@@ -1050,11 +1250,6 @@ SJM.M = (function () {
             if (!j.career.best || r.rank < j.career.best) j.career.best = r.rank;
           }
         }
-        const falls = r.j.filter((x) => x.f);
-        if (falls.length && Math.random() < 0.3 * injMult(j)) {
-          const overHS = falls.some((x) => x.d > W.getHill(ev.hill).HS);
-          injure(j, (overHS ? 'upadek po skoku za HS w konkursie ' : 'upadek w konkursie ') + title, overHS ? 'fallHS' : 'fall');
-        }
         // punkty
         if (r.rank && r.rank <= 30) {
           const pts = SJM.WC_POINTS[r.rank - 1];
@@ -1063,6 +1258,7 @@ SJM.M = (function () {
             s.standings.nc[j.nation] = (s.standings.nc[j.nation] || 0) + pts;
             if (W.getHill(ev.hill).K >= 170) s.standings.flying[r.id] = (s.standings.flying[r.id] || 0) + pts;
           }
+          if (ev.level === 'SGP') s.standings.snc[j.nation] = (s.standings.snc[j.nation] || 0) + pts;
           const key = { COC: 'coc', FIS: 'fis', SGP: 'sgp', SCOC: 'scoc' }[ev.level];
           if (key) s.standings[key][r.id] = (s.standings[key][r.id] || 0) + pts;
           addPeriodPts(j, ev.level, currentWeek().period, pts);
@@ -1115,6 +1311,7 @@ SJM.M = (function () {
       for (const row of res.ranking) {
         row.members.forEach((id) => { const j = s.jumpers[id]; if (j) { j.fatigue = U.clamp(j.fatigue + 4, 0, 100); j.lastStart = turn(); } });
         if (ev.level === 'WC' && row.rank <= 8) s.standings.nc[row.nat] = (s.standings.nc[row.nat] || 0) + SJM.TEAM_POINTS[row.rank - 1];
+        if (ev.level === 'SGP' && row.rank <= 8) s.standings.snc[row.nat] = (s.standings.snc[row.nat] || 0) + SJM.TEAM_POINTS[row.rank - 1];
         if (lv.champs && row.rank <= 3) medal(ev, row.nat, row.rank, row.members);
         if (row.nat === my && ev.level === "WC" && row.rank <= 3) { s.player.popularity += 0.3; s.player.board += 0.4; }
       }
@@ -1146,7 +1343,7 @@ SJM.M = (function () {
     for (const id of ids) {
       const j = s.jumpers[id];
       if (!j) continue;
-      if (ev.level === 'WJC') { j.career.jrMedals = (j.career.jrMedals || 0) + 1; if (ev.format === 'ind') wjcQuotaBonus(nat); }
+      if (ev.level === 'WJC') { j.career.jrMedals = (j.career.jrMedals || 0) + 1; if (ev.format === 'ind') wjcQuotaBonus(nat, j.id); }
       else {
         j.career.medals[key]++;
         // medale indywidualne z podziałem na imprezy (IO, MŚ, MŚ w lotach)
@@ -1244,6 +1441,16 @@ SJM.M = (function () {
     };
   }
 
+  // regres z wiekiem na tydzień (da – „wiek biologiczny” po cechach długowieczność / wczesne starzenie)
+  function ageDecline(k, da, prof) {
+    if (da < 28) return 0;
+    if (k === 'power') return 0.013 * (da - 27) * (1 - prof.center * 0.05);
+    if (da >= 29 && (k === 'takeoff' || k === 'inrun')) return 0.0075 * (da - 28);
+    if (da >= 30 && k === 'flight') return 0.005 * (da - 29);
+    if (da >= 34) return 0.004 * (da - 33);
+    return 0;
+  }
+
   function coachFor(j, prof) {
     const g = j.group || 'R';
     if (g === 'A') return { q: prof.coachA, key: 'coachA' };
@@ -1298,7 +1505,27 @@ SJM.M = (function () {
     const seasonF = inSeason ? 0.85 : access.summer;
 
     if (j.suspended > 0) j.suspended = Math.max(0, j.suspended - weeks);
+
+    const T = SJM.T;
+    // cechy: późny rozwój, pracuś, długowieczność / wczesne starzenie
+    const late = T.has(j, 'latebloom'), worker = T.has(j, 'workhorse');
+    const declineShift = T.has(j, 'longevity') ? 3 : T.has(j, 'earlyage') ? -2 : 0;
+    const declineMult = T.has(j, 'longevity') ? 0.6 : T.has(j, 'earlyage') ? 1.4 : 1;
+    const da = a - declineShift; // „wiek biologiczny" dla regresu
+
+    // kontuzja: bez treningu, ale wiek działa dalej; przy cięższym urazie spada motoryka i wybicie,
+    // zmęczenie schodzi (odpoczynek), morale powoli spada (frustracja), forma leci w dół
     if (j.injury > 0) {
+      const sevLoss = { light: 0, medium: 0.02, severe: 0.045 }[j.injSev] || 0;
+      for (const at of SJM.ATTRS) {
+        const k = at.key;
+        let loss = ageDecline(k, da, prof) * declineMult;
+        if (k === 'power') loss += sevLoss * (1 - prof.physio / 200);
+        else if (k === 'takeoff') loss += sevLoss * 0.6 * (1 - prof.physio / 200);
+        j.attrs[k] = U.clamp(j.attrs[k] - loss * weeks, 5, 99);
+      }
+      j.fatigue = U.clamp(j.fatigue * Math.pow(0.6, weeks), 0, 100);
+      j.morale = U.clamp(j.morale + (40 - j.morale) * Math.min(1, 0.06 * weeks), 10, 90);
       j.injury -= weeks * (1 + prof.medical * 0.1 + prof.physio / 300);
       if (j.injury <= 0) {
         j.injury = 0; j.injType = null; j.injSev = null;
@@ -1307,13 +1534,6 @@ SJM.M = (function () {
       j.form = Math.max(-10, j.form - 0.5 * weeks);
       return;
     }
-
-    const T = SJM.T;
-    // cechy: późny rozwój, pracuś, długowieczność / wczesne starzenie
-    const late = T.has(j, 'latebloom'), worker = T.has(j, 'workhorse');
-    const declineShift = T.has(j, 'longevity') ? 3 : T.has(j, 'earlyage') ? -2 : 0;
-    const declineMult = T.has(j, 'longevity') ? 0.6 : T.has(j, 'earlyage') ? 1.4 : 1;
-    const da = a - declineShift; // „wiek biologiczny" dla regresu
     // losowość rozwoju: przełomowe lato albo stagnacja (j.devMult ustawiane po sezonie)
     // zawodnik zostawiony na treningu w tygodniu zawodów (status „trening”, bez startu): spokojna praca w domu
     const wk = live && inSeason && ((isPlayer && j.status === 'train') || j.homeTurn === turn()) && j.lastStart !== turn() ? st().calendar.weeks[st().week] : null;
@@ -1342,15 +1562,7 @@ SJM.M = (function () {
       const rate = 0.055 * ageF * coachF * it.grow * focusF * facF * hillF * seasonF * gapF * devMult * (isPlayer ? 1 + modVal("train") : 1);
       j.attrs[k] += rate * weeks * (0.6 + Math.random() * 0.8);
 
-      // regres z wiekiem (przesunięty/osłabiony przez cechy)
-      if (da >= 28) {
-        let dec = 0;
-        if (k === "power") dec = 0.013 * (da - 27) * (1 - prof.center * 0.05);
-        else if (da >= 29 && (k === "takeoff" || k === "inrun")) dec = 0.0075 * (da - 28);
-        else if (da >= 30 && k === "flight") dec = 0.005 * (da - 29);
-        else if (da >= 34) dec = 0.004 * (da - 33);
-        j.attrs[k] -= dec * declineMult * weeks;
-      }
+      j.attrs[k] -= ageDecline(k, da, prof) * declineMult * weeks;
       j.attrs[k] = U.clamp(j.attrs[k], 5, 99);
     }
 
@@ -1363,7 +1575,7 @@ SJM.M = (function () {
       // szansa na „zaskoczenie” na treningu
       if (homeTrain && Math.random() < 0.12) {
         j.form = U.clamp(j.form + 1.5, -10, 10);
-        if (j.group === 'A' || j.group === 'B') news('Przełom na treningu', `${W.fullName(j)} ${j.homeByCoach ? 'z decyzji trenera ' : ''}zamiast startu został na treningu i coś „zaskoczyło” – forma wyraźnie w górę.`, 'training');
+        if (isPlayer && (j.group === 'A' || j.group === 'B')) news('Przełom na treningu', `${W.fullName(j)} ${j.homeByCoach ? 'z decyzji trenera ' : ''}zamiast startu został na treningu i coś „zaskoczyło” – forma wyraźnie w górę.`, 'training');
       }
       j.fatigue = U.clamp(j.fatigue * 0.6 - prof.physio / 20 - prof.medical * 1.5 + it.load * (set.focus === 'rest' ? 0.3 : 1) - (homeTrain ? 6 : 0), 0, 100);
       j.morale += (55 - j.morale) * 0.1;
@@ -1899,6 +2111,14 @@ SJM.M = (function () {
         staffLog(n.code, `${RN(r)}: ${staffName(x)} ${why}.`, s.season - 1);
         if (r === 'coachA') w.heads.push({ code: n.code, old: staffName(x), why });
       }
+      // wspólna baza trenerów: po odejściu trenera kadry A federacja często awansuje dobrego trenera kadry B
+      const b = ns.staff.coachB;
+      if (!ns.staff.coachA && b && b.quality >= W.aiBase(n.code).coachA - 5 && Math.random() < 0.6) {
+        ns.staff.coachB = null; b.role = 'coachA'; b.salary = Math.max(b.salary, r1000(salaryFor('coachA', b.quality) * (b.nation === n.code ? localPay(n.code) : 1)));
+        ns.staff.coachA = b;
+        staffLog(n.code, `${staffName(b)}: awans z trenera kadry B na trenera kadry A.`, s.season - 1);
+        const h = w.heads.find((e) => e.code === n.code && !e.now); if (h) h.now = staffName(b) + ' (awans z kadry B)';
+      }
       W.syncAi(n.code);
     }
     // okno zaczyna się od przedłużeń (także gdy nie ma czego przedłużać – można jeszcze kogoś zwolnić przed naborem)
@@ -1945,7 +2165,56 @@ SJM.M = (function () {
   }
 
   // ----- kwiecień: okno kontraktowe (rundy ofert o wolnych sztabowców) -----
-  function freeFor(role, code) { return st().staffMarket.filter((x) => x.role === role && !(x.blocked || []).includes(code)); }
+  // trenerzy kadr (A, B, juniorzy) to wspólna baza: każdy wolny trener może objąć dowolną kadrę
+  const COACH_ROLES = ['coachA', 'coachB', 'coachJ'];
+  const isCoach = (r) => COACH_ROLES.includes(r);
+  const sameKind = (a, b) => a === b || (isCoach(a) && isCoach(b));
+  // podczas naboru na funkcję trenerską cała baza wolnych trenerów jest wystawiona na tę funkcję (żądania wg stanowiska)
+  function relabelCoaches(r) { if (isCoach(r)) for (const x of st().staffMarket) if (isCoach(x.role)) x.role = r; }
+  function freeFor(role, code) { return st().staffMarket.filter((x) => sameKind(x.role, role) && !(x.blocked || []).includes(code)); }
+  // awans / przesunięcie naszego trenera na wolne stanowisko trenerskie (np. trener kadry B → kadra A) – tylko w oknie;
+  // w marcu można tak zastąpić trenera, z którym nie chcemy przedłużać (jego kontrakt wygasa)
+  function coachMoves() {
+    const s = st(), p = s.player, w = s.staffWindow, out = [];
+    if (!w) return out;
+    for (const to of COACH_ROLES) {
+      const cur = p.staff[to];
+      const pending = cur && w.phase === 'renew' && w.renew.find((e) => e.role === to && e.id === cur.id && !e.result);
+      if (cur && !pending && !cur.interim) continue;
+      if (w.phase === 'draft' && ROLE_ORDER.indexOf(to) < w.roleIdx) continue;
+      for (const from of COACH_ROLES) {
+        const x = p.staff[from];
+        if (from === to || !x || x.interim) continue;
+        if (w.phase === 'draft' && ROLE_ORDER.indexOf(from) < w.roleIdx) continue;
+        out.push({ from, to, id: x.id, name: staffName(x), q: x.quality, replaces: cur && !cur.interim ? staffName(cur) : null });
+      }
+    }
+    return out;
+  }
+  function promoteCoach(from, to) {
+    const s = st(), p = s.player, w = s.staffWindow;
+    if (!coachMoves().some((m) => m.from === from && m.to === to)) return 'Takie przesunięcie nie jest teraz możliwe.';
+    const x = p.staff[from], cur = p.staff[to];
+    const newAsk = r1000(salaryFor(to, x.quality) * (x.nation === s.nation ? localPay(s.nation) : 1) * (x.greed || 1));
+    const raise = Math.max(0, newAsk - x.salary);
+    // pensja zastępowanego (wygasający kontrakt) przestaje się liczyć do budżetu płacowego
+    const freed = cur ? cur.salary : 0;
+    if (raise > payrollRoom() + freed) return `Zarząd nie zatwierdzi podwyżki przy awansie (+${U.money(raise)}): zabrakłoby miejsca w budżecie płacowym sztabu.`;
+    if (cur) {
+      if (cur.interim) p.staff[to] = null;
+      else { const it = w.renew.find((e) => e.role === to && e.id === cur.id && !e.result); if (it) renewOffer(it.id, null); }
+    }
+    p.staff[from] = null;
+    x.role = to; x.salary += raise;
+    p.staff[to] = x;
+    // jego własne negocjacje (wygasający kontrakt) idą razem z nim na nowe stanowisko
+    const own = w.phase === 'renew' && w.renew.find((e) => e.id === x.id && !e.result);
+    if (own) { own.role = to; own.ask = renewAsk(x, s.nation); own.mood = renewMood(x, s.nation); }
+    staffLog(s.nation, `${staffName(x)}: awans z funkcji „${RN(from)}” na „${RN(to)}”${raise ? ` (pensja ${U.money(x.salary)})` : ''}.`, s.season - 1);
+    // trwał nabór właśnie na tę funkcję – kończymy w nim udział
+    if (w.phase === 'draft' && curRole() === to) { delete w.intents[s.nation]; resolveRound(null); advance(); }
+    return null;
+  }
   // awaryjny „newgen”, gdy wolnych sztabowców brakuje
   function emergencyStaff(role, qMean, nat) {
     const x = W.genStaff(role, qMean, nat, 8);
@@ -1986,6 +2255,7 @@ SJM.M = (function () {
     // oferty jeszcze nierozstrzygnięte (runda przerwana po naszym przegranym pojedynku) zostają w grze
     w.intents = w.intents || {};
     delete w.intents[s.nation];
+    relabelCoaches(r);
     supplyMarket(r);
     // kraje AI bez oferty: każdy z wakatem wybiera jednego kandydata
     for (const n of SJM.NATIONS) if (n.code !== s.nation && !staffOf(n.code)[r] && !w.intents[n.code]) aiPick(n, r);
@@ -2221,7 +2491,7 @@ SJM.M = (function () {
         + (risk.length ? `Po sezonie inspekcja może obniżyć klasę (słaby stan techniczny): ${risk.map((h) => `${h.name} – ${Math.round(h.condition)}%, min. ${HOMOL[h.homol.cls].cond}%`).join(', ')}. ` : '') + 'Szczegóły w Infrastrukturze.', 'infra');
     }
     s.ncPrev = { ...((s.standings && s.standings.nc) || {}) }; // kolejność startu drużyn przed pierwszymi punktami PN
-    s.standings ={ wc: {}, nc: {}, tcs: {}, tcsN: {}, raw: {}, rawN: {}, coc: {}, fis: {}, flying: {}, sgp: {}, scoc: {} };
+    s.standings ={ wc: {}, nc: {}, tcs: {}, tcsN: {}, raw: {}, rawN: {}, coc: {}, fis: {}, flying: {}, sgp: {}, scoc: {}, snc: {} };
     s.results = {};
     s.seasonMedals = [];
     for (const j of Object.values(s.jumpers)) { j.season = W.blankSeasonStats(); j.ovrStart = W.overall(j); j.quitRisk = false; newSeasonShape(j); if (!j.traits) SJM.T.assign(j); }
@@ -2258,7 +2528,7 @@ SJM.M = (function () {
 
     // klasyfikacje końcowe
     // punkty sezonu zapamiętane do uprawnień i kwot (1. okres następnego sezonu)
-    for (const j of Object.values(s.jumpers)) { j.prevPts = { WC: s.standings.wc[j.id] || 0, COC: s.standings.coc[j.id] || 0, FIS: s.standings.fis[j.id] || 0, SGP: s.standings.sgp[j.id] || 0, SCOC: s.standings.scoc[j.id] || 0 }; j.lic = null;
+    for (const j of Object.values(s.jumpers)) { updateLife(j); j.prevPts = { WC: s.standings.wc[j.id] || 0, COC: s.standings.coc[j.id] || 0, FIS: s.standings.fis[j.id] || 0, SGP: s.standings.sgp[j.id] || 0, SCOC: s.standings.scoc[j.id] || 0 }; updateLife(j); j.lic = null;
       j.ppPrev = j.pp || blankPP(); j.pp = blankPP(); // punkty okresów do rankingów kroczących
       j.endMorale = j.morale; j.endStarts = j.season.starts; j.endCupStarts = j.season.cupStarts || 0;
       // kolejne sezony seniora bez regularnych startów w PŚ/LGP (głównie PK, FIS Cup albo nic)
@@ -2273,6 +2543,7 @@ SJM.M = (function () {
       season: s.season, label: summary.label,
       wc: topList(s.standings.wc, 10).map(([id, pts]) => snapshotJumper(id, pts)),
       nc: topList(s.standings.nc, 8).map(([nat, pts]) => ({ nat, pts })),
+      snc: topList(s.standings.snc || {}, 8).map(([nat, pts]) => ({ nat, pts })),
       tcs: topList(tcsFull, 3).map(([id, pts]) => snapshotJumper(id, pts)),
       raw: topList(rawFull, 3).map(([id, pts]) => snapshotJumper(id, pts)),
       rawName: SJM.CAL.nordicName(),
@@ -2537,7 +2808,7 @@ SJM.M = (function () {
       pop: def.pop + (owg ? 10 : 0), budget: Math.round(def.budget * (owg ? 2.5 : 1) * 10) / 10, cap: owg ? 34 : U.randInt(18, 26), depth: def.depth + (owg ? 3 : 0), owgYear: owgYear || null };
     W.syncNations(s);
     const n = W.nationData(code);
-    s.nations[code] = { code, ai: W.aiProfile(n), quota: { WC: 1, COC: 2, FIS: 4 }, budget: n.budget, cap: n.depth + (owg ? 4 : 2) };
+    s.nations[code] = { code, ai: W.aiProfile(n), quota: { WC: 1, COC: 2, FIS: QUOTA_RULES.fisQuota }, budget: n.budget, cap: n.depth + (owg ? 4 : 2) };
     // pierwsza kadra: głównie nastolatki, czasem przekwalifikowani biegacze/kombinatorzy/alpejczycy
     const potMean = 50 + n.strength * 0.32 + (owg ? 3 : 0);
     const size = n.depth;
@@ -2653,10 +2924,10 @@ SJM.M = (function () {
   }
 
   return {
-    turn, migrate, news, myJumpers, jumpersOf, costScale, initStartingPoints, computePeriodQuotas, periodBonusPreview, quotaWhy, OLY, olyStart, olyYearOf, olyCutoff, olympicAllocation, rollingPts, hasSummer, currentPeriod, licenseFor, ineligibleReason, pointsOf, HOST_BONUS, QUOTA_RULES, titleHolders, DELEGABLE, isDelegated, setDelegated, jumperStatus, setStatus, deadline, confirmNominations, unconfirmNominations, assistantFill, needsNominations, ledger, modVal, addMod, tickMods, mods, isJunior, available, currentWeek, quotaFor, weekLevels, eligible,
+    turn, migrate, news, myJumpers, jumpersOf, costScale, initStartingPoints, computePeriodQuotas, periodBonusPreview, quotaWhy, hasNationalGroup, hostBonusIn, nationalGroupChoice, setNationalGroup, OLY, olyStart, olyYearOf, olyCutoff, olympicAllocation, rollingPts, hasSummer, currentPeriod, licenseFor, ineligibleReason, pointsOf, HOST_BONUS, QUOTA_RULES, titleHolders, DELEGABLE, isDelegated, setDelegated, jumperStatus, setStatus, deadline, confirmNominations, unconfirmNominations, assistantFill, needsNominations, ledger, modVal, addMod, tickMods, mods, isJunior, available, currentWeek, quotaFor, weekLevels, eligible,
     lastWeekendNote, autoGroups, setGroup, groupCount, GROUP_LIMITS, groupDraft, draftGroupOf, draftCount, draftGroup, draftOverLimit, confirmGroups, discardGroups, ensureNominations, nominationLevelOf, setNomination,
     playWeek, annualCosts, annualIncome, buildHill, hillSites, nextHillCity, randomHillCity, modernize, addIgelit, addLights, demolish, upgradeFacility,
-    payrollRoom, payrollCap, payrollFrozen, coachLimit, joinNation, HOST_REQ, HOMOL, HOMOL_ORDER, LEVEL_CLASS, homolClass, homolMeets, homolBest, homolCost, homologate, canHost, bid, unbid, MAX_CYCLE_BIDS, hire, fire, renewOffer, finishRenewals, staffBid, skipRound, passRole, finishWindow, ROLE_ORDER, staffAsk, staffProspect, interimStaff, rivalsFor, freeFor, vacancies, prestige, expectationText, startSeason, endSeason, ncOrder, rankOf, potEstimate,
+    payrollRoom, payrollCap, payrollFrozen, coachLimit, coachMoves, promoteCoach, isCoach, teamChangeInfo, setTeamChange, wjcReserve, joinNation, HOST_REQ, HOMOL, HOMOL_ORDER, LEVEL_CLASS, homolClass, homolMeets, homolBest, homolCost, homologate, canHost, bid, unbid, MAX_CYCLE_BIDS, hire, fire, renewOffer, finishRenewals, staffBid, skipRound, passRole, finishWindow, ROLE_ORDER, staffAsk, staffProspect, interimStaff, rivalsFor, freeFor, vacancies, prestige, expectationText, startSeason, endSeason, ncOrder, rankOf, potEstimate,
     hillAccess, JUNIOR_MAX_AGE, hillProjectBusy, hostNationOf, teamFor, CUP_KEY,
   };
 })();

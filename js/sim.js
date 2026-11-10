@@ -157,6 +157,9 @@ SJM.SIM = (function () {
     const seedOf = (id) => (opts.seed && byIdAll[id] ? opts.seed(byIdAll[id]) : 0);
     const byIdAll = Object.fromEntries(field.map((j) => [j.id, j]));
     let qualOrder = null;
+    // upadek może skończyć się kontuzją (opts.fallInjury) – kontuzjowany nie skacze już w kolejnych seriach
+    const hurt = new Set();
+    const checkFalls = (jumps) => { if (opts.fallInjury) for (const r of jumps) if (r.f && !hurt.has(r.id) && byIdAll[r.id] && opts.fallInjury(byIdAll[r.id], r)) hurt.add(r.id); };
     if ((opts.qual && field.length > qualLimit) || ko) {
       const ctx = roundCtx(field, hill, equip, wind);
       const order = startOrder(field);
@@ -165,9 +168,17 @@ SJM.SIM = (function () {
         if (Math.random() < dsqChance(j) * 0.5) r.x = 1;
         return r;
       });
+      checkFalls(jumps);
+      jumps.forEach((r) => { if (hurt.has(r.id)) r.inj = 1; });
       // remis w kwalifikacjach: wyżej zawodnik z lepszym miejscem w klasyfikacji generalnej (opts.seed)
       const sorted = jumps.slice().sort((a, b) => (a.x ? 1 : 0) - (b.x ? 1 : 0) || b.p - a.p || seedOf(b.id) - seedOf(a.id));
-      const passedList = sorted.slice(0, qualLimit).filter((r) => !r.x).map((r) => r.id);
+      // ex aequo na ostatnim miejscu premiowanym awansem – awansują wszyscy (oprócz TCS, gdzie liczba par jest stała)
+      let nPass = qualLimit;
+      if (!ko && sorted[nPass - 1] && !sorted[nPass - 1].x) {
+        const lastP = Math.round(sorted[nPass - 1].p * 10);
+        while (sorted[nPass] && !sorted[nPass].x && Math.round(sorted[nPass].p * 10) === lastP) nPass++;
+      }
+      const passedList = sorted.slice(0, nPass).filter((r) => !r.x && !r.inj).map((r) => r.id);
       const passed = new Set(passedList);
       res.qual = { gate: ctx.gate, order: order.map((j) => j.id), jumps: sorted.map((r, i) => ({ ...r, rank: i + 1, q: passed.has(r.id) ? 1 : 0 })) };
       field = field.filter((j) => passed.has(j.id));
@@ -194,6 +205,8 @@ SJM.SIM = (function () {
       return r;
     });
     res.rounds.push({ gate: ctx1.gate, order: order1.map((j) => j.id), jumps: r1 });
+    checkFalls(r1);
+    // kontuzjowany w 1. serii zachowuje miejsce w tabeli, ale nie startuje w 2. (zajmuje miejsce po finalistach)
     const r1ok = r1.filter((r) => !r.x).sort((a, b) => b.p - a.p);
     let advancing;
     if (pairs) {
@@ -225,13 +238,14 @@ SJM.SIM = (function () {
     const byId = Object.fromEntries(field.map((j) => [j.id, j]));
 
     // 2. seria: kolejność odwrotna do wyników
-    const order2 = advancing.slice().reverse().map((r) => byId[r.id]);
+    r1.forEach((r) => { if (hurt.has(r.id)) r.inj = 1; });
+    const order2 = advancing.filter((r) => !hurt.has(r.id)).reverse().map((r) => byId[r.id]);
     const ctx2 = roundCtx(order2, hill, equip, wind);
     // silny, zmienny wiatr: seria odwołana, liczą się wyniki po 1. serii
     const off2 = order2.length > 0 && stormy(ctx2);
     if (off2) res.note = 'Druga seria odwołana z powodu wiatru – wyniki po 1. serii.';
     const r2map = {};
-    const leaderId = advancing.length ? advancing[0].id : null;
+    const leaderId = order2.length ? order2[order2.length - 1].id : null;
     const r2 = (off2 ? [] : order2).map((j) => {
       const r = jump(j, hill, ctx2, event.level, 2, equip, { leader: j.id === leaderId });
       if (Math.random() < dsqChance(j) * 0.4) r.x = 1;
@@ -239,12 +253,14 @@ SJM.SIM = (function () {
       return r;
     });
     if (r2.length) res.rounds.push({ gate: ctx2.gate, order: order2.map((j) => j.id), jumps: r2 });
+    checkFalls(r2);
+    r2.forEach((r) => { if (hurt.has(r.id)) r.inj = 1; });
 
     // kolejne serie (MŚ w lotach: 3. i 4.) – ta sama stawka, kolejność odwrotna do aktualnej klasyfikacji
     const later = {};
     const sumOf = (id) => [r1.find((x) => x.id === id), r2map[id], ...(later[id] || [])].reduce((a, x) => a + (x && !x.x ? x.p : 0), 0);
     for (let k = 3; k <= nRounds && r2.length; k++) {
-      const alive = order2.filter((j) => !(r2map[j.id] && r2map[j.id].x) && !(later[j.id] || []).some((x) => x.x));
+      const alive = order2.filter((j) => !hurt.has(j.id) && !(r2map[j.id] && r2map[j.id].x) && !(later[j.id] || []).some((x) => x.x));
       const ord = alive.slice().sort((a, b) => sumOf(a.id) - sumOf(b.id));
       const ctxK = roundCtx(ord, hill, equip, wind);
       if (stormy(ctxK)) { res.note = `${k}. seria odwołana z powodu wiatru – wyniki po ${k - 1} seriach.`; break; }
@@ -256,7 +272,9 @@ SJM.SIM = (function () {
         return r;
       });
       res.rounds.push({ gate: ctxK.gate, order: ord.map((j) => j.id), jumps: rk });
+      checkFalls(rk);
     }
+    res.injured = [...hurt];
 
     const rows = r1.map((a) => {
       const b = r2map[a.id];

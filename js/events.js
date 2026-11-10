@@ -599,13 +599,7 @@ SJM.EV = (function () {
         { t: 'Przyjąć decyzję i wyciągnąć wnioski', hint: 'ryzyko DSQ −30% (10 tyg.)', fx: () => { mod('dsq', -0.3, 10, 'Lekcja po dyskwalifikacji'); return 'Serwismeni jeszcze dokładniej sprawdzają sprzęt.'; } },
       ],
     },
-    {
-      id: 'competition_cancel', cat: 'zawody', w: 2, phase: 'season', cd: 25,
-      when: () => { const w = upcoming(); if (!w) return null; const e = w.events.find((x) => x.level === 'COC' || x.level === 'FIS'); return e ? { eid: e.id } : null; },
-      title: () => 'Konkurs odwołany',
-      text: (c) => { const e = upcoming().events.find((x) => x.id === c.eid); return `Ze względu na silny wiatr organizatorzy odwołali konkurs: ${e ? SJM.CAL.eventTitle(e) : ''}.`; },
-      auto: (c) => { const w = upcoming(); w.events = w.events.filter((x) => x.id !== c.eid); M.ensureNominations(); return 'Zawodnicy wykorzystają czas na trening.'; },
-    },
+    // odwołanie konkursu z powodu wiatru: losowane dopiero w dniu zawodów (M.playWeek), nie z wyprzedzeniem
 
     // ===================== OBOZY / TRENING =====================
     {

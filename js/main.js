@@ -146,7 +146,7 @@ SJM.MAIN = (function () {
       <div class="title">SKI JUMPING <span>MANAGER</span> 2027</div>
       <div class="sub">Poprowadź kadrę narodową skoczków od Pucharu FIS po złoto olimpijskie</div>
       <div class="start-panel">
-        <div class="row mb">${slotBtn('auto', '▶ Kontynuuj (autozapis)')}${slotBtn('manual', '📂 Wczytaj zapis')}<button class="btn" data-start="import">📥 Importuj z pliku</button></div>
+        <div class="row mb">${slotBtn('auto', '▶ Kontynuuj (autozapis)')}${slotBtn('manual', '📂 Wczytaj zapis')}<button class="btn" data-start="import">📥 Importuj z pliku</button>${SJM.UPD ? `<button class="btn" data-start="update" title="Wersja gry: ${SJM.UPD.label(SJM.UPD.cur())}">⬇ Sprawdź aktualizacje</button>` : ''}</div>
         <div class="card mb"><h2>Nowa gra</h2>
           <div class="row mb"><label>Imię i nazwisko menedżera:</label><input type="text" id="mgr-name" value="${U.esc(localStorage.getItem('sjm2027:lastname') || '')}" placeholder="np. Jan Kowalski" maxlength="40" style="width:260px"></div>
           <h3>Wybierz kraj</h3>
@@ -167,7 +167,9 @@ SJM.MAIN = (function () {
         <button class="btn" data-start="export">📤 Eksportuj zapis do pliku</button>
         <button class="btn" data-start="import">📥 Importuj zapis z pliku</button>
         <button class="btn" data-start="quit">🏠 Menu główne</button>
+        ${SJM.UPD ? `<button class="btn" data-start="update">⬇ Sprawdź aktualizacje</button>` : ''}
       </div>
+      ${SJM.UPD ? `<p class="small muted mt">Wersja gry: ${SJM.UPD.label(SJM.UPD.cur())}</p>` : ''}
       <div class="row mt"><label>Rozgrywanie zawodów:</label>
         <select onchange="SJM.state.settings = SJM.state.settings || {}; SJM.state.settings.playMode = this.value; SJM.UI.toast('Zapisano ustawienie');">
           ${[['ask', 'Pytaj przed każdym weekendem'], ['live', 'Zawsze na żywo (PŚ i imprezy z naszymi)'], ['fast', 'Zawsze szybka symulacja']].map(([v, l]) => `<option value="${v}" ${((SJM.state.settings || {}).playMode || 'ask') === v ? 'selected' : ''}>${l}</option>`).join('')}
@@ -200,6 +202,8 @@ SJM.MAIN = (function () {
       SJM.SAVE.exportFile();
     } else if (a === 'savem') {
       SJM.SAVE.save('manual').then((ok) => { if (ok) SJM.UI.toast('Gra zapisana'); });
+    } else if (a === 'update') {
+      SJM.UPD.checkNow();
     } else if (a === 'quit') {
       SJM.SAVE.save('auto').then(showStart);
     }
@@ -212,6 +216,7 @@ SJM.MAIN = (function () {
     SJM.UI.init();
     const imp = window.SJM_IMPORT;
     (imp ? SJM.SAVE.importData(imp) : Promise.resolve()).then(SJM.SAVE.migrate).then(showStart, showStart);
+    if (SJM.UPD) { if (/[?&]updtest=1/.test(location.search)) SJM.UPD.selfTest(); else SJM.UPD.autoCheck(); }
   }
 
   return { boot, showStart, showMenu, showGame };

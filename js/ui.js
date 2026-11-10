@@ -128,7 +128,7 @@ SJM.UI = (function () {
     jumper: ['Profil zawodnika', [
       '<b>Umiejętności</b> to 8 cech w skali 1–20. Ocena na mamutach i na normalnej skoczni pokazuje, gdzie zawodnik jest mocniejszy.',
       '<b>Cechy</b> (np. Lotnik, Nerwy ze stali) wpływają na skoki. Część jest ukryta i sztab odkrywa je z czasem.',
-      '<b>Uprawnienia</b> mówią, w jakich cyklach zawodnik może startować. Zdobywa się je punktami.',
+      '<b>Uprawnienia</b> mówią, w jakich cyklach zawodnik może startować. Zdobywa się je punktami. Punkty PŚ lub LGP dają dożywotnie prawo startu w PŚ i LGP, a punkty PK lub LPK dożywotnie prawo startu w PK i LPK.',
       '<b>Konkursy w sezonie</b> to wszystkie starty w bieżącym sezonie. Kliknij zawody, żeby zobaczyć pełne wyniki.',
     ]],
   };
@@ -351,7 +351,7 @@ SJM.UI = (function () {
   // z kogo korzysta trener przy danym cyklu (zawodnicy zgłoszeni przez nas gdzie indziej, np. na PŚ, są pominięci)
   const COACH_POOL = {
     COC: 'głównie kadra B, ale także zawodnicy kadry A, których nie zgłosiłeś na PŚ (wyraźnie lepszy zawodnik z A wygrywa z zawodnikiem z B), oraz klubowi i juniorzy',
-    SCOC: 'kadra B, klubowi i juniorzy (bez kadry A, która latem skacze w LGP)',
+    SCOC: 'głównie kadra B, ale także zawodnicy kadry A, których nie zgłosiłeś na LGP (wyraźnie lepszy zawodnik z A wygrywa z zawodnikiem z B), oraz klubowi i juniorzy',
     SGP: 'głównie kadra A, w razie potrzeby kadra B i pozostali',
     FIS: 'juniorzy, klubowi i kadra B (bez kadry A)',
     WJC: 'juniorzy U-20 (kadra A tylko w razie braku zawodników)',
@@ -443,9 +443,9 @@ SJM.UI = (function () {
       <div class="row between"><div><b>${per === 0 ? 'Lato' : `Okres ${per} z 3`}</b> · ${next ? `kolejne przeliczenie: <b>${fmtDay(new Date(next.date))}</b> (${esc(next.label)})` : 'ostatni okres sezonu – kolejne przeliczenie po sezonie'}</div>
       <div class="small muted">Okresy: lato · 1) start → TCS · 2) TCS → styczeń · 3) luty → koniec sezonu</div></div>
       <p class="small muted" style="line-height:1.6">Kwoty liczy się z rankingów kroczących FIS z ostatnich 12 miesięcy: na początku każdego okresu wyniki tego sezonu zastępują ten sam okres poprzedniego, więc jeden słabszy okres nie przekreśla kwoty.<br>
-      <b>PŚ</b> (ranking światowy: PŚ + LGP): po 1 miejscu za zawodnika w top ${R.wrlTop} (maks. ${R.wrlPerNation} na kraj); kraj z 1–2 zawodnikami dostaje +2, z 3 – +1; +1 za zawodnika w top 3 ostatniego okresu PK, +1 za medal indywidualny MŚJ; maks. ${R.maxWC}. Każdy kraj może zgłosić co najmniej ${R.basicWC} zawodników. Gospodarz: +${H.WC} (grupa krajowa).<br>
+      <b>PŚ</b> (ranking światowy: PŚ + LGP): po 1 miejscu za zawodnika w top ${R.wrlTop} (maks. ${R.wrlPerNation} na kraj); kraj z 1–2 zawodnikami dostaje +2, z 3 – +1; +1 za zawodnika w top 3 ostatniego okresu PK, +1 za medal indywidualny MŚJ (to miejsce może zająć tylko medalista albo inny junior U-20); maks. ${R.maxWC}. Każdy kraj może zgłosić co najmniej ${R.basicWC} zawodników. Gospodarz: +${H.WC} (grupa krajowa) – tylko w 2 konkursach indywidualnych w sezonie: cały weekend albo pierwszy konkurs dwóch weekendów u siebie (np. weekend z drużynówką zużywa 1). Weekendy wybierasz w Zgłoszeniach, bez wyboru – kolejność kalendarza. Tak samo w LGP.<br>
       <b>PK</b> (ranking kontynentalny: PK + LPK): po 1 miejscu za zawodnika w top ${R.crlTop} (maks. ${R.crlPerNation} na kraj), co najmniej ${R.minCOC}, a do tego +1 za każdego zawodnika w top 3 ostatniego okresu FIS Cup (ponad minimum); maks. ${R.maxCOC}. Gospodarz +${H.COC}.<br>
-      <b>FIS Cup</b>: ${R.baseFIS} + 1 za każdego zawodnika w top ${R.fisTop} rankingu FIS Cup (maks. +${R.fisPerNation}); gospodarz +${H.FIS}. MŚ/IO/MŚ w lotach: 4 + obrońcy tytułu.<br>
+      <b>FIS Cup</b>: każdy kraj ma kwotę ${R.fisQuota} (także gospodarz). MŚ/IO/MŚ w lotach: 4 + obrońcy tytułu.<br>
       Lato: Letnie Grand Prix – kwota jak w PŚ (gospodarz +${H.SGP}), Letni PK – jak w PK (gospodarz +${H.SCOC}). Do startu w PŚ i LGP zawodnik potrzebuje punktów PŚ, LGP, PK lub LPK, w PK i LPK – dowolnych punktów FIS (z tego lub poprzedniego sezonu).</p>${periodBonusHtml()}${olympicHtml()}</div>
       <table><tr><th>Kraj</th><th class="num">PŚ</th><th class="num" title="Zawodnicy w top ${R.wrlTop} rankingu światowego (maks. ${R.wrlPerNation} na kraj)">top ${R.wrlTop} świat</th><th class="num">dodatkowe</th><th class="num">PK</th><th class="num" title="Zawodnicy w top ${R.crlTop} rankingu kontynentalnego">top ${R.crlTop} PK</th><th class="num">FIS Cup</th></tr>
       ${rows.map((c) => { const q = s.nations[c].quota; return `<tr class="${c === s.nation ? 'mine' : ''}"><td>${natl(c)}</td><td class="num"><b>${q.WC}</b>${chg(q.WC, q.prevWC)}</td><td class="num">${q.wrl !== undefined ? q.wrl : '–'}</td><td class="num small">${bonus(q)}</td><td class="num"><b>${q.COC}</b>${chg(q.COC, q.prevCOC)}</td><td class="num">${q.crl !== undefined ? q.crl : '–'}</td><td class="num">${q.FIS}${chg(q.FIS, q.prevFIS)}</td></tr>`; }).join('')}</table>`;
@@ -483,17 +483,31 @@ SJM.UI = (function () {
   function quotaNote(lv, wk) {
     const s = st();
     const q = s.nations[s.nation].quota;
-    const host = wk.events.some((e) => e.level === lv && M.hostNationOf(e.hill) === s.nation);
+    const host = M.hostBonusIn(lv, s.nation, wk);
+    // grupa krajowa (PŚ/LGP): 2 konkursy indywidualne w sezonie – gracz wybiera, w których weekendach u siebie ją wykorzystać
+    const ng = wk === M.currentWeek() ? M.nationalGroupChoice(lv) : null;
+    let ngNote = '';
+    if (ng) {
+      const conf = !!M.ensureNominations().confirmed;
+      const opts = [[0, 'Nie wykorzystuj']].concat(ng.n >= 2 ? [[1, 'Tylko 1. konkurs'], [2, 'Oba konkursy']] : [[1, 'Wykorzystaj']]);
+      ngNote = `<div class="mt small"><b>Grupa krajowa</b> (+${M.HOST_BONUS[lv]}, w sezonie 2 konkursy indywidualne u siebie; wykorzystane dotąd: ${ng.used}, zostało: ${2 - ng.used})${ng.chosen ? '' : ' · <span class="muted">domyślnie: kolejność kalendarza</span>'}
+        <div class="seg mt">${opts.map(([k, l]) => `<button class="${ng.cur === k ? 'on' : ''}" data-act="ngpick" data-lv="${lv}" data-n="${k}" ${conf || k > ng.max ? 'disabled' : ''}>${l}</button>`).join('')}</div>
+        ${ng.cur && ng.cur < ng.n ? `<div class="warn">Grupa krajowa tylko w 1. konkursie indywidualnym – w kolejnym startuje ${q.WC} najlepszych ze zgłoszonych.</div>` : ''}
+        ${2 - ng.used - ng.cur > 0 ? `<div class="muted">Pozostałe ${2 - ng.used - ng.cur} – na pierwszy konkurs kolejnego weekendu u siebie.</div>` : ''}</div>`;
+    }
     // deficyt: trener delegowanego cyklu wysyła mniejszą ekipę
     const ql = M.quotaFor(lv, s.nation, wk), cl = M.coachLimit(lv, ql);
     const save = M.isDelegated(lv) && cl < ql ? ` · <span class="warn">deficyt – trener wyśle maks. ${cl}</span>` : '';
     // weekend z konkursem drużynowym podnosi kwotę do 4
     const team = (lv === 'WC' || lv === 'SGP') && M.quotaFor(lv, s.nation, wk) > q.WC + (host ? M.HOST_BONUS[lv] : 0) ? ` · <span class="pos">konkurs drużynowy – można zgłosić 4</span>` : '';
-    if (lv === 'WC') return `<div class="small muted">Kwota (okres ${M.currentPeriod()}): ${q.WC}${q.wrl !== undefined ? ` · ${M.quotaWhy(q)}` : ''}${host ? ` · <span class="pos">+${M.HOST_BONUS.WC} grupa krajowa</span>` : ''}${team}</div>`;
-    if (lv === 'SGP') return `<div class="small muted">Kwota jak w PŚ: ${q.WC}${host ? ` · <span class="pos">+${M.HOST_BONUS.SGP} grupa krajowa</span>` : ''}${team}</div>`;
+    // miejsce za medal MŚJ: tylko medalista albo inny junior
+    const wr = M.wjcReserve(lv, s.nation, wk);
+    const wjc = wr ? ` · <span class="warn">1 miejsce za medal MŚJ – tylko dla ${wr.medal.length ? `medalisty (${wr.medal.map((id) => s.jumpers[id] ? esc(s.jumpers[id].last) : '?').join(', ')}) albo ` : ''}juniora U-20</span>` : '';
+    if (lv === 'WC') return `<div class="small muted">Kwota (okres ${M.currentPeriod()}): ${q.WC}${q.wrl !== undefined ? ` · ${M.quotaWhy(q)}` : ''}${host ? ` · <span class="pos">+${M.HOST_BONUS.WC} grupa krajowa</span>` : ''}${team}${wjc}</div>${ngNote}`;
+    if (lv === 'SGP') return `<div class="small muted">Kwota jak w PŚ: ${q.WC}${host ? ` · <span class="pos">+${M.HOST_BONUS.SGP} grupa krajowa</span>` : ''}${team}${wjc}</div>${ngNote}`;
     if (lv === 'COC') return `<div class="small muted">Kwota: ${q.COC}${q.crl !== undefined ? ` · w top ${M.QUOTA_RULES.crlTop} rankingu PK: ${q.crl}${q.crl < M.QUOTA_RULES.minCOC ? ` (min. ${M.QUOTA_RULES.minCOC})` : ''}${q.fisB ? `, +${q.fisB} za top 3 FIS Cup` : ''}` : ''}${host ? ` · <span class="pos">+${M.HOST_BONUS.COC} gospodarz</span>` : ''}${save}</div>`;
     if (lv === 'SCOC') return `<div class="small muted">Kwota jak w PK: ${q.COC}${host ? ` · <span class="pos">+${M.HOST_BONUS.SCOC} gospodarz</span>` : ''}${save}</div>`;
-    if (lv === 'FIS') return `<div class="small muted">Kwota: ${q.FIS}${host ? ` · <span class="pos">+${M.HOST_BONUS.FIS} gospodarz</span>` : ''}${save}</div>`;
+    if (lv === 'FIS') return `<div class="small muted">Kwota: ${ql} (stała dla każdego kraju)${save}</div>`;
     if (lv === 'OWG') {
       const o = s.olyQuota, n = M.quotaFor('OWG', s.nation, wk);
       if (!o || o.year !== s.calendar.season + 1) return `<div class="small muted">Kwoty olimpijskie nie zostały jeszcze przyznane.</div>`;
@@ -520,13 +534,52 @@ SJM.UI = (function () {
       <div class="row"><button class="btn go" data-act="playgo">▶ Rozegraj (zaznaczone na żywo)</button><button class="btn" data-act="playfast">⏩ Wszystko szybko</button>
       <span class="small muted">Domyślny tryb zmienisz w Menu.</span></div>`);
   }
+  // kontuzja w trakcie weekendu: zmiana składu drużyny przed kolejnym konkursem drużynowym
+  let teamChangeCont = null;
+  function teamChangeModal(cont) {
+    const s = st(), t = M.teamChangeInfo();
+    if (!t) return cont();
+    teamChangeCont = cont;
+    const nm = (id) => { const j = s.jumpers[id]; return j ? `${esc(W.fullName(j))} (${Math.round(W.overall(j))}, forma ${U.fmt1(j.form)})` : '?'; };
+    const hurt = t.injured.map((id) => `<b>${esc(W.fullName(s.jumpers[id]))}</b>${s.jumpers[id].injType ? ` (${esc(s.jumpers[id].injType)}, ${s.jumpers[id].injury} tyg.)` : ''}`).join(', ');
+    const enough = t.cands.length >= t.size;
+    openModal(`<h2>🚑 Kontuzja – zmiana składu</h2>
+      <p>${hurt} ${t.injured.length > 1 ? 'nie mogą' : 'nie może'} wystąpić w konkursie: <b>${esc(t.title)}</b>.</p>
+      ${enough ? `<p class="small muted">Ustal skład i kolejność grup (ostatni skacze lider). Do wyboru są zdrowi zawodnicy zgłoszeni na ten weekend.</p>
+      <div class="card tight mb"><table>${t.suggested.map((sel, i) => `<tr><td>Grupa ${i + 1}</td><td><select class="tcpick">${t.cands.map((id) => `<option value="${id}" ${id === sel ? 'selected' : ''}>${nm(id)}</option>`).join('')}</select></td></tr>`).join('')}</table></div>
+      <div class="row"><button class="btn go" data-act="tcok">Zatwierdź skład</button><button class="btn" data-act="tcauto">Niech wybierze trener</button></div>`
+      : `<p class="neg">Zostało za mało zdrowych zgłoszonych zawodników (${t.cands.length}/${t.size}) – drużyna nie wystartuje.</p><button class="btn go" data-act="tcauto">Dalej</button>`}`);
+  }
+  function teamChangeDone(ids) {
+    const err = M.setTeamChange(ids);
+    if (err) return toast(err, true);
+    closeModal();
+    const c = teamChangeCont; teamChangeCont = null;
+    if (c) c();
+  }
   function doPlay(liveIds) {
     const s = st();
     const idx = s.week;
     closeModal();
+    const wk = M.currentWeek();
     const r = M.playWeek();
+    // weekend wstrzymany: decyzja o składzie drużyny, potem dokończenie (te same konkursy na żywo)
+    // najpierw transmisje konkursów rozegranych do tej chwili, a okienko dopiero po nich – o kontuzji dowiadujemy się po konkursie
+    if (r === 'teamChange') {
+      SJM.SAVE.save('auto');
+      const played = new Set(wk.events.slice(0, s.weekRun.next).map((e) => e.id));
+      const now = (liveIds || []).filter((id) => played.has(id)), rest = (liveIds || []).filter((id) => !played.has(id));
+      const ask = () => teamChangeModal(() => doPlay(rest));
+      if (now.length) SJM.LIVE.open(now[0], { live: true, queue: now.slice(1), onExit: ask });
+      else ask();
+      return;
+    }
     SJM.SAVE.save('auto');
     const after = () => { if (r === 'seasonEnd') go('summary'); else go('week', { i: idx }); };
+    // konkursy odwołane w dniu zawodów znikają z tygodnia – nie ma czego oglądać na żywo
+    const held = new Set(((wk && wk.events) || []).map((e) => e.id));
+    if ((liveIds || []).some((id) => !held.has(id))) toast('Konkurs odwołany z powodu silnego wiatru.');
+    liveIds = (liveIds || []).filter((id) => held.has(id));
     if (liveIds && liveIds.length) SJM.LIVE.open(liveIds[0], { live: true, queue: liveIds.slice(1), onExit: after });
     else after();
   }
@@ -570,7 +623,7 @@ SJM.UI = (function () {
     const s = st(), p = s.player;
     const role = params.role || 'all';
     let market = s.staffMarket.slice();
-    if (role !== 'all') market = market.filter((x) => x.role === role);
+    if (role !== 'all') market = market.filter((x) => x.role === role || (M.isCoach(role) && M.isCoach(x.role)));
     market.sort((a, b) => b.quality - a.quality);
     const spec = (x) => x.spec ? SJM.ATTRS.find((a) => a.key === x.spec).name : '–';
     const tags = (x) => `${x.exJumper ? ' <span class="small muted" title="Były skoczek">🎿 były skoczek</span>' : ''}${x.newgen ? ' <span class="small muted">🌱 debiutant</span>' : ''}${x.interim ? ' <span class="small warn" title="Pełniący obowiązki do końca sezonu">p.o.</span>' : ''}`;
@@ -587,7 +640,7 @@ SJM.UI = (function () {
       <div class="tabs"><button class="${role === 'all' ? 'active' : ''}" data-act="staffrole" data-role="all">Wszyscy</button>${Object.entries(SJM.STAFF_ROLES).map(([r, i]) => `<button class="${role === r ? 'active' : ''}" data-act="staffrole" data-role="${r}">${i.name}</button>`).join('')}</div>
       <div class="card tight"><h3>Wolni agenci</h3><table>
         <tr><th>Osoba</th><th>Funkcja</th><th class="c">Jakość</th><th>Specjalność</th><th class="num">Min. żądanie od nas</th><th></th></tr>
-        ${market.map((x) => { const cur = p.staff[x.role]; return `<tr><td>${W.flag(x.nation)} ${esc(x.first + ' ' + x.last)} <span class="muted small">(${x.age} l.)</span>${tags(x)}</td><td>${SJM.STAFF_ROLES[x.role].name}</td>
+        ${market.map((x) => { const cur = p.staff[x.role]; return `<tr><td>${W.flag(x.nation)} ${esc(x.first + ' ' + x.last)} <span class="muted small">(${x.age} l.)</span>${tags(x)}</td><td>${M.isCoach(x.role) ? 'Trener (kadra A, B lub juniorzy)' : SJM.STAFF_ROLES[x.role].name}</td>
           <td class="c">${staffQ(x)} ${cur ? `<span class="small ${x.quality > cur.quality ? 'pos' : 'neg'}" title="Różnica względem naszego sztabowca">${x.quality > cur.quality ? '+' : ''}${x.quality - cur.quality}</span>` : ''}</td>
           <td>${spec(x)}</td><td class="num">${U.money(M.staffAsk(x, s.nation))}</td>
           <td>${(x.blocked || []).includes(s.nation) ? '<span class="small neg">nie chce z nami pracować</span>' : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Brak wolnych agentów</td></tr>'}
@@ -604,6 +657,12 @@ SJM.UI = (function () {
     const spec = (x) => x.spec ? SJM.ATTRS.find((a) => a.key === x.spec).name : '–';
     const who = (x) => `${W.flag(x.nation)} ${esc(x.first + ' ' + x.last)}${x.real ? '' : ''}${x.exJumper ? ' <span class="small muted">🎿 były skoczek</span>' : ''}${x.newgen ? ' <span class="small muted">🌱 debiutant</span>' : ''}`;
     const yearsSel = (id, def) => `<select id="${id}">${[1, 2, 3].map((y) => `<option value="${y}" ${y === def ? 'selected' : ''}>${y} ${y === 1 ? 'sezon' : 'sezony'}</option>`).join('')}</select>`;
+    // awanse trenerów: wspólna baza – trener kadry B może objąć kadrę A itd.
+    const moves = M.coachMoves();
+    const promoCard = moves.length ? `<div class="card mb"><h3>Awanse trenerów</h3>
+      <p class="small muted">Trenerzy kadr to jedna baza – możesz przesunąć swojego trenera na wolne stanowisko (np. trenera kadry B na kadrę A) zamiast szukać nowego. Zachowuje kontrakt; jeśli na nowym stanowisku należy mu się więcej, dostaje podwyżkę. Zwolnione przez niego miejsce obsadzisz w naborze.</p>
+      <table>${moves.map((m) => `<tr><td>${esc(m.name)} <span class="small muted">(jakość ${m.q})</span></td><td>${SJM.STAFF_ROLES[m.from].name} → <b>${SJM.STAFF_ROLES[m.to].name}</b>${m.replaces ? ` <span class="small muted">(zamiast przedłużenia: ${esc(m.replaces)})</span>` : ''}</td>
+        <td><button class="btn small primary" data-act="promote" data-from="${m.from}" data-to="${m.to}">Awansuj</button></td></tr>`).join('')}</table></div>` : '';
     if (w.phase === 'renew') {
       const RES = { accepted: '<span class="pos">✔ Przedłużył kontrakt</span>', refused: '<span class="neg">✖ Odrzucił ofertę – odchodzi na rynek</span>', retired: '<span class="neg">👴 Odrzucił ofertę i przechodzi na emeryturę</span>', released: '<span class="muted">Kontrakt wygasł</span>' };
       return `<h1>Okno kontraktowe · marzec: przedłużenia</h1>${payNote}
@@ -616,7 +675,7 @@ SJM.UI = (function () {
             <td class="num">${x && !it.result ? U.money(x.salary) : ''}</td><td class="num">${U.money(it.ask)}</td><td class="small">${esc(it.mood)}</td>
             <td>${it.result ? RES[it.result] + (it.chance !== undefined ? ` <span class="small muted">(szansa ${Math.round(it.chance * 100)}%)</span>` : '') : `<div class="row"><input id="rs-${it.id}" type="number" step="1000" min="${it.ask}" value="${it.ask}" style="width:110px"> ${yearsSel('ry-' + it.id, 2)}
               <button class="btn small primary" data-act="renew" data-id="${it.id}">Złóż ofertę</button><button class="btn small danger" data-act="norenew" data-id="${it.id}">Nie przedłużaj</button></div>`}</td></tr>`; }).join('')}
-        </table></div>
+        </table></div>${promoCard}
         <button class="btn primary" data-act="renewdone">Rozpocznij nabór ▶</button> <span class="small muted">${w.renew.length ? 'Nierozstrzygnięte kontrakty wygasną.' : ''}</span>`;
     }
     // faza naboru: funkcje po kolei, od trenera kadry A
@@ -661,7 +720,7 @@ SJM.UI = (function () {
     return `<h1>Okno kontraktowe · nabór: ${RNm(role)} (runda ${w.roleRound})</h1>${payNote}
       <div class="card mb small">${steps}</div>
       <p class="muted">Nabór idzie funkcja po funkcji. W każdej rundzie każda reprezentacja z wakatem wybiera jednego kandydata – kraje SI już wybrały (kolumna „Rywale”), teraz Ty. Potem kandydaci rozstrzygani są po kolei od najlepszego: jedna oferta – podpisuje, kilka – losowanie według atrakcyjności ofert. Przegrani od razu, przed rozstrzygnięciem kolejnego kandydata, wybierają nowy cel – także takiego, o którego walczą już inni (gdy przegramy, nabór czeka na nasz wybór). Kto spasuje, bierze słabszego lokalnego sztabowca (u nas: p.o. po oknie). Kraje SI z wakatem na tej funkcji: ${aiLeft}.</p>
-      ${lastBox}${body}
+      ${lastBox}${promoCard}${body}
       <div class="row mt"><button class="btn" data-act="skipround">Przeczekaj rundę</button><button class="btn" data-act="passrole">Pasuj: ${RNm(role)}</button><button class="btn danger" data-act="finishwin">Zakończ okno</button></div>
       ${curFeed.length ? `<h3 class="mt">Przebieg naboru: ${RNm(role)}</h3><div class="card tight mb">${feedTable(curFeed)}</div>` : ''}
       ${pastFeed ? `<h3 class="mt">Zakończone nabory</h3>${pastFeed}` : ''}`;
@@ -959,11 +1018,16 @@ SJM.UI = (function () {
   SCREENS.standings = () => {
     const s = st();
     const tab = params.tab || 'wc';
-    const tabs = [['wc', 'Puchar Świata'], ['nc', 'Puchar Narodów'], ['tcs', 'Turniej Czterech Skoczni'], ['raw', SJM.CAL.nordicName() || 'Raw Air / TN'], ['flying', 'Loty'], ['sgp', 'Letnie Grand Prix'], ['coc', 'Puchar Kontynentalny'], ['scoc', 'Letni PK'], ['fis', 'FIS Cup (lato + zima)'], ['medals', 'Medale'], ['quota', 'Kwoty startowe']];
+    const tabs = [['wc', 'Puchar Świata'], ['nc', 'Puchar Narodów'], ['tcs', 'Turniej Czterech Skoczni'], ['raw', SJM.CAL.nordicName() || 'Raw Air / TN'], ['flying', 'Loty'], ['sgp', 'Letnie Grand Prix'], ['snc', 'Puchar Narodów LGP'], ['coc', 'Puchar Kontynentalny'], ['scoc', 'Letni PK'], ['fis', 'FIS Cup (lato + zima)'], ['medals', 'Medale'], ['quota', 'Kwoty startowe']];
     let body = '';
     if (tab === 'nc') {
       const order = M.ncOrder();
       body = `<table><tr><th class="num">#</th><th>Kraj</th><th class="num">Punkty</th><th class="num">Kwota PŚ</th></tr>${order.map((c, i) => `<tr class="${c === s.nation ? 'mine' : ''}"><td class="num">${i + 1}.</td><td>${natl(c)}${s.dormant && s.dormant[c] ? ` <span class="small muted" title="Nowa reprezentacja: ${esc(s.dormant[c].reason)}">🌱 od ${s.dormant[c].joined}/${String(s.dormant[c].joined + 1).slice(2)}</span>` : ""}</td><td class="num"><b>${s.standings.nc[c] || 0}</b></td><td class="num">${s.nations[c].quota.WC}</td></tr>`).join('')}</table>`;
+    } else if (tab === 'snc') {
+      const snc = s.standings.snc || {};
+      const order = Object.keys(snc).sort((a, b) => snc[b] - snc[a]);
+      body = order.length ? `<table><tr><th class="num">#</th><th>Kraj</th><th class="num">Punkty</th></tr>${order.map((c, i) => `<tr class="${c === s.nation ? 'mine' : ''}"><td class="num">${i + 1}.</td><td>${natl(c)}</td><td class="num"><b>${snc[c]}</b></td></tr>`).join('')}</table>
+        <p class="small muted" style="padding:0 12px">Punkty LGP wszystkich zawodników kraju oraz punkty za konkursy drużynowe LGP (top 8).</p>` : '<div class="empty">Brak punktów</div>';
     } else if (tab === 'tcs' || tab === 'raw') {
       body = standingTable(s.standings[tab], s.standings[tab + 'N']) + `<p class="small muted" style="padding:0 12px">Suma punktów (nie punktów PŚ) ze wszystkich konkursów cyklu. Klasyfikowani są tylko zawodnicy, którzy wystąpili we wszystkich.</p>`;
       if (tab === 'raw' && !SJM.CAL.nordicName()) body = '<div class="empty">W tym sezonie nie ma turnieju nordyckiego – Raw Air (3 kolejne weekendy PŚ w Norwegii) albo Turniej Nordycki (3 kolejne weekendy w Norwegii, Finlandii lub Szwecji) powstaje tylko, gdy tak ułoży się kalendarz.</div>';
@@ -1098,8 +1162,8 @@ SJM.UI = (function () {
     const legends = s.retired.filter((r) => r.wins || r.medals.g + r.medals.s + r.medals.b).sort((a, b) => b.wins - a.wins).slice(0, 30);
     const champ = (list) => list && list[0] ? `${W.flag(list[0].nat)} ${esc(list[0].name)}` : '–';
     return `<h1>Historia</h1>
-      <div class="card tight scroll mb"><h3>Sezony</h3>${seasons.length ? `<table><tr><th>Sezon</th><th>Kryształowa Kula</th><th>Puchar Narodów</th><th>TCS</th><th>Raw Air / TN</th><th>PK</th><th>FIS Cup</th><th>LGP</th><th>LPK</th><th>Nasz kraj (PN / cel)</th><th class="c">Nasze medale</th><th class="c">Zarząd</th></tr>
-        ${seasons.map((h) => `<tr><td><b>${h.label}</b></td><td>${champ(h.wc)}</td><td>${h.nc[0] ? natl(h.nc[0].nat) : '–'}</td><td>${champ(h.tcs)}</td><td>${champ(h.raw)}${h.raw[0] && h.rawName === 'Turniej Nordycki' ? ' <span class="muted small">(TN)</span>' : ''}</td><td>${champ(h.coc)}</td><td>${champ(h.fis)}</td><td>${champ(h.sgp)}</td><td>${champ(h.scoc)}</td>
+      <div class="card tight scroll mb"><h3>Sezony</h3>${seasons.length ? `<table><tr><th>Sezon</th><th>Kryształowa Kula</th><th>Puchar Narodów</th><th>TCS</th><th>Raw Air / TN</th><th>PK</th><th>FIS Cup</th><th>LGP</th><th>PN LGP</th><th>LPK</th><th>Nasz kraj (PN / cel)</th><th class="c">Nasze medale</th><th class="c">Zarząd</th></tr>
+        ${seasons.map((h) => `<tr><td><b>${h.label}</b></td><td>${champ(h.wc)}</td><td>${h.nc[0] ? natl(h.nc[0].nat) : '–'}</td><td>${champ(h.tcs)}</td><td>${champ(h.raw)}${h.raw[0] && h.rawName === 'Turniej Nordycki' ? ' <span class="muted small">(TN)</span>' : ''}</td><td>${champ(h.coc)}</td><td>${champ(h.fis)}</td><td>${champ(h.sgp)}</td><td>${h.snc && h.snc[0] ? natl(h.snc[0].nat) : '–'}</td><td>${champ(h.scoc)}</td>
         <td class="${h.player.ncRank <= h.player.target ? 'pos' : 'neg'}">${h.player.ncRank}. / ${h.player.target}.</td><td class="c">${h.player.medals}</td><td class="c">${h.player.board}</td></tr>`).join('')}</table>` : '<div class="empty">Historia pojawi się po zakończeniu pierwszego sezonu.</div>'}</div>
       ${seasons.map((h) => h.medals.length ? `<div class="card tight mb"><h3>Imprezy mistrzowskie ${h.label}</h3><table>${h.medals.map((m) => `<tr class="${m.nat === s.nation ? 'mine' : ''}"><td>${medalIcon(m.place)}</td><td class="small">${esc(m.event)}</td><td>${W.flag(m.nat)} ${esc(m.names.join(', '))}</td></tr>`).join('')}</table></div>` : '').join('')}
       ${legends.length ? `<div class="card tight"><h3>Legendy na emeryturze</h3><table><tr><th>Zawodnik</th><th class="num">Wygrane PŚ</th><th class="num">Podia</th><th class="c">Medale</th><th class="num">Kule</th><th class="num">Koniec kariery</th></tr>${legends.map((r) => `<tr class="${r.nat === s.nation ? 'mine' : ''}"><td>${W.flag(r.nat)} ${esc(r.name)}</td><td class="num">${r.wins}</td><td class="num">${r.podiums}</td><td class="c">${r.medals.g}/${r.medals.s}/${r.medals.b}</td><td class="num">${r.globes}</td><td class="num">${r.retired}</td></tr>`).join('')}</table></div>` : ''}`;
@@ -1410,12 +1474,16 @@ SJM.UI = (function () {
       case "assist": M.assistantFill(); return result(null, "Asystent zaproponował zawodników w Twoich cyklach");
       case "clearnom": { const n = M.ensureNominations(); Object.keys(n.byLevel).forEach((k) => { if (!M.isDelegated(k)) n.byLevel[k] = []; }); n.teams = {}; return render(); }
       case "deleg": M.setDelegated(d.lv, d.on === "1"); return render();
+      case "ngpick": M.setNationalGroup(d.lv, +d.n); return render();
       case "confirmnom": { M.confirmNominations(); SJM.SAVE.save("auto"); return result(null, "Składy zatwierdzone"); }
       case "unconfirmnom": M.unconfirmNominations(); return render();
       case "playgo": return doPlay([...document.querySelectorAll(".liveev:checked")].map((x) => x.value));
       case "playfast": return doPlay([]);
       case 'hire': return result(M.hire(d.id), 'Zatrudniono');
       case 'renew': return result(M.renewOffer(d.id, +$('#rs-' + d.id).value, +$('#ry-' + d.id).value), 'Oferta złożona');
+      case 'tcok': return teamChangeDone([...document.querySelectorAll('#modal .tcpick')].map((x) => x.value));
+      case 'tcauto': return teamChangeDone(null);
+      case 'promote': { const m = M.coachMoves().find((x) => x.from === d.from && x.to === d.to); if (m && m.replaces && !confirm(`Awansować ${m.name}? Kontrakt ${m.replaces} nie zostanie przedłużony.`)) return; return result(M.promoteCoach(d.from, d.to), 'Trener awansowany'); }
       case 'norenew': if (!confirm('Nie przedłużać kontraktu? Ta osoba trafi na rynek, ale nie będzie chciała z nami rozmawiać.')) return; return result(M.renewOffer(d.id, null), 'Kontrakt wygaśnie');
       case 'renewdone': return result(M.finishRenewals(), 'Okno kontraktowe otwarte');
       case 'cwrole': params = { ...params, role: d.role, cand: null }; return render();

@@ -90,7 +90,7 @@ SJM.LIVE = (function () {
     L.tab = 'main';
     L.tour = tourBase(ev);
     L.nc = ncBase(ev);
-    const tabs = [['main', 'Konkurs']].concat(L.tour ? [['tour', 'Klasyfikacja ' + L.tour.name]] : [], L.nc ? [['nc', 'Puchar Narodów']] : []);
+    const tabs = [['main', 'Konkurs']].concat(L.tour ? [['tour', 'Klasyfikacja ' + L.tour.name]] : [], L.nc ? [['nc', L.nc.name]] : []);
     const left = L.queue.length;
     SJM.UI.openModal(`<button class="close" data-act="close">×</button>
       <div class="row between mb"><div><h2 style="margin:0">${L.live ? '<span class="pill onair">● NA ŻYWO</span> ' : ''}${U.esc(SJM.CAL.eventTitle(ev))}</h2><div class="muted small">${U.esc(hill.name)}, ${U.esc(hill.city)} · K-${hill.K} · HS${hill.HS}${left ? ` · jeszcze ${left} ${left === 1 ? 'konkurs' : 'konkursy'} w kolejce` : ''}</div></div>
@@ -227,14 +227,14 @@ SJM.LIVE = (function () {
       return `<tr class="${jp && jp.nation === s.nation ? 'mine' : ''} ${id === L.lastId && L.playing ? 'flash' : ''}"><td class="num">${i + 1}.</td><td>${jp ? W.flag(jp.nation) + ' ' + U.esc(W.fullName(jp)) : '?'}${today}</td><td class="num"><b>${U.fmt1(p)}</b></td><td class="num small muted">${i ? '−' + U.fmt1(lead - p) : ''}</td></tr>`;
     }).join('');
   }
-  // Puchar Narodów (PŚ) przed tym konkursem – z wcześniejszych konkursów PŚ w sezonie (indywidualne: pkt PŚ zawodników, drużyny: top 8)
+  // Puchar Narodów (PŚ albo LGP) przed tym konkursem – z wcześniejszych konkursów cyklu w sezonie (indywidualne: pkt zawodników, drużyny: top 8)
   function ncBase(ev) {
-    if (!ev || ev.level !== 'WC') return null;
+    if (!ev || (ev.level !== 'WC' && ev.level !== 'SGP')) return null;
     const s = SJM.state, evs = s.calendar.weeks.flatMap((w) => w.events), idx = evs.findIndex((e) => e.id === ev.id);
     if (idx < 0) return null;
     const pts = {};
-    evs.slice(0, idx).filter((e) => e.level === 'WC').forEach((e) => addNcPoints(pts, s.results[e.id]));
-    return { pts };
+    evs.slice(0, idx).filter((e) => e.level === ev.level).forEach((e) => addNcPoints(pts, s.results[e.id]));
+    return { pts, name: ev.level === 'SGP' ? 'Puchar Narodów LGP' : 'Puchar Narodów' };
   }
   function addNcPoints(pts, r) {
     if (!r || !r.ranking) return;
@@ -261,7 +261,7 @@ SJM.LIVE = (function () {
     const tbl = document.getElementById('lv-board'), t = document.getElementById('lv-board-title');
     if (!tbl) return;
     const { rows, today, live } = ncRanks();
-    if (t) t.textContent = `Puchar Narodów ${L.finished ? 'po konkursie' : live ? 'na żywo' : 'przed konkursem'}`;
+    if (t) t.textContent = `${L.nc.name} ${L.finished ? 'po konkursie' : live ? 'na żywo' : 'przed konkursem'}`;
     if (!rows.length) { tbl.innerHTML = `<tr><td class="muted small">Brak punktów – klasyfikacja ruszy po pierwszej serii.</td></tr>`; return; }
     const lead = rows[0][1];
     tbl.innerHTML = rows.map(([n, p], i) => {
@@ -325,7 +325,9 @@ SJM.LIVE = (function () {
     if (prev && fr0.round !== prev.round && L.pausedFor !== L.i) { L.pausedFor = L.i; return roundBreak(prev, fr0); }
     const fr = L.frames[L.i];
     const remaining = L.frames.length - L.i;
-    if (L.onlyMine && !isMine(fr) && remaining > 10) {
+    // czołówka (10 ostatnich skoków konkursu) tylko w planowo ostatniej serii – przy serii odwołanej przez wiatr
+    // ostatnia rozegrana seria wygląda jak każda wcześniejsza, żeby nie zdradzić odwołania przed jej końcem
+    if (L.onlyMine && !isMine(fr) && (remaining > 10 || L.res.note)) {
       account(fr); L.i++;
       if (L.i % 10 === 0) renderBoard();
       L.timer = setTimeout(step, 0);
