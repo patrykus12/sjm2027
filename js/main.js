@@ -124,6 +124,7 @@ SJM.MAIN = (function () {
     document.getElementById('start').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     SJM.M.migrate();
+    if (SJM.NAMES) SJM.NAMES.syncState(SJM.state); // nazwiska z edytora (także zmienione po ostatnim zapisie)
     SJM.UI.closeModal();
     SJM.UI.go(SJM.state.gameOver ? 'summary' : 'dashboard');
   }
@@ -146,7 +147,7 @@ SJM.MAIN = (function () {
       <div class="title">SKI JUMPING <span>MANAGER</span> 2027</div>
       <div class="sub">Poprowadź kadrę narodową skoczków od Pucharu FIS po złoto olimpijskie</div>
       <div class="start-panel">
-        <div class="row mb">${slotBtn('auto', '▶ Kontynuuj (autozapis)')}${slotBtn('manual', '📂 Wczytaj zapis')}<button class="btn" data-start="import">📥 Importuj z pliku</button>${SJM.UPD ? `<button class="btn" data-start="update" title="Wersja gry: ${SJM.UPD.label(SJM.UPD.cur())}">⬇ Sprawdź aktualizacje</button>` : ''}</div>
+        <div class="row mb">${slotBtn('auto', '▶ Kontynuuj (autozapis)')}${slotBtn('manual', '📂 Wczytaj zapis')}<button class="btn" data-start="import">📥 Importuj z pliku</button>${SJM.NAMES ? '<button class="btn" data-start="names">✏️ Edytor nazwisk</button>' : ''}${SJM.UPD ? `<button class="btn" data-start="update" title="Wersja gry: ${SJM.UPD.label(SJM.UPD.cur())}">⬇ Sprawdź aktualizacje</button>` : ''}</div>
         <div class="card mb"><h2>Nowa gra</h2>
           <div class="row mb"><label>Imię i nazwisko menedżera:</label><input type="text" id="mgr-name" value="${U.esc(localStorage.getItem('sjm2027:lastname') || '')}" placeholder="np. Jan Kowalski" maxlength="40" style="width:260px"></div>
           <h3>Wybierz kraj</h3>
@@ -166,6 +167,7 @@ SJM.MAIN = (function () {
         <button class="btn" data-start="savem">💾 Zapisz grę</button>
         <button class="btn" data-start="export">📤 Eksportuj zapis do pliku</button>
         <button class="btn" data-start="import">📥 Importuj zapis z pliku</button>
+        <button class="btn" data-start="names">✏️ Edytor nazwisk</button>
         <button class="btn" data-start="quit">🏠 Menu główne</button>
         ${SJM.UPD ? `<button class="btn" data-start="update">⬇ Sprawdź aktualizacje</button>` : ''}
       </div>
@@ -192,6 +194,7 @@ SJM.MAIN = (function () {
       const name = document.getElementById('mgr-name').value.trim() || 'Menedżer';
       try { localStorage.setItem('sjm2027:lastname', name); } catch (err) { /* brak miejsca */ }
       SJM.W.newGame(selNation, name, { real: document.getElementById("real-db").checked });
+      if (SJM.NAMES) SJM.state.nameMap = JSON.parse(JSON.stringify(SJM.NAMES.overrides()));
       SJM.SAVE.save('auto');
       showGame();
     } else if (a === 'load') {
@@ -202,6 +205,8 @@ SJM.MAIN = (function () {
       SJM.SAVE.exportFile();
     } else if (a === 'savem') {
       SJM.SAVE.save('manual').then((ok) => { if (ok) SJM.UI.toast('Gra zapisana'); });
+    } else if (a === 'names') {
+      SJM.NAMES.open();
     } else if (a === 'update') {
       SJM.UPD.checkNow();
     } else if (a === 'quit') {

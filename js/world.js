@@ -172,6 +172,13 @@ SJM.W = (function () {
     return MEDAL_IDX[normName(first + last)] || MEDAL_IDX[normName(last + first)] || null;
   }
 
+  // cechy przypisane prawdziwym zawodnikom (js/traits.js) – po nazwisku z bazy (rec.nk z edytora nazwisk), nie po zmienionym
+  let TRAIT_IDX = null;
+  function realTraits(rec) {
+    if (!TRAIT_IDX) { TRAIT_IDX = {}; for (const [k, v] of Object.entries(SJM.REAL_TRAITS || {})) TRAIT_IDX[normName(k)] = v; }
+    return TRAIT_IDX[rec.nk || normName(rec.f + rec.l)] || [];
+  }
+
   function realJumper(rec) {
     const rt = realRating(rec);
     const nat = rec.n, first = rec.f, last = rec.l, fly = U.clamp(rt.fl, -2, 8);
@@ -207,7 +214,7 @@ SJM.W = (function () {
     const pod = realPodiums(first, last);
     if (pod) { j.career.wins = pod[2]; j.career.podiums = pod[2] + pod[3] + pod[4]; j.career.realPodiums = { g: pod[2], s: pod[3], b: pod[4] }; j.career.best = pod[2] ? 1 : pod[3] ? 2 : 3; }
     setOverall(j, target);
-    const fixed = (SJM.REAL_TRAITS[first + " " + last] || []).slice();
+    const fixed = realTraits(rec).slice();
     if (rt.fl >= 3.5 && !fixed.includes("flyer")) fixed.push("flyer");
     SJM.T.assign(j, { fixed, flyingBias: 0.02, randomScale: 0.5 });
     j.pot = Math.max(j.pot, overall(j));
@@ -478,7 +485,9 @@ SJM.W = (function () {
   }
 
   function fullName(j) { return j.first + ' ' + j.last; }
+  // edytor nazwisk zmienił tabele z bazy: indeksy podiów i medali trzeba zbudować od nowa
+  function resetNameIdx() { PODIUM_IDX = null; MEDAL_IDX = null; }
   function flag(code) { const n = nationData(code); return n ? '<span class="fl fl-' + code + '" title="' + n.name + '"></span>' : ''; }
 
-  return { nationData, syncNations, aiProfile, getHill, hillType, startHomol, maturity, age, skill, overall, genJumper, genStaff, genStaffMarket, exJumperStaff, genAiStaff, syncAi, aiBase, staffNat, initNation, realRating, profile, equipBonus, newGame, fullName, flag, blankSeasonStats, normName, realPodiums };
+  return { nationData, syncNations, aiProfile, getHill, hillType, startHomol, maturity, age, skill, overall, genJumper, genStaff, genStaffMarket, exJumperStaff, genAiStaff, syncAi, aiBase, staffNat, initNation, realRating, profile, equipBonus, newGame, fullName, flag, blankSeasonStats, normName, realPodiums, resetNameIdx };
 })();

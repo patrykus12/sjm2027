@@ -1,7 +1,7 @@
 // Service worker wersji iOS (PWA): gra działa offline. Pliki gry w pamięci podręcznej, nowa wersja przy kolejnym
 // uruchomieniu z siecią (build.ps1 wstawia numer wersji i listę plików). Zapisy gry są w IndexedDB – nie tutaj.
-const VERSION = 'sjm-261110-1226';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon.png', './css/style.css', './js/calendar.js', './js/data.js', './js/events.js', './js/live.js', './js/main.js', './js/manager.js', './js/realdb.js', './js/realelo.js', './js/realextra.js', './js/realglobes.js', './js/realmedals.js', './js/realpodium.js', './js/realstaff.js', './js/realtitles.js', './js/sim.js', './js/traits.js', './js/ui.js', './js/update.js', './js/util.js', './js/version.js', './js/world.js'];
+const VERSION = 'sjm-261113-0900';
+const FILES = ['./', './index.html', './manifest.webmanifest', './icon.png', './css/style.css', './js/calendar.js', './js/data.js', './js/events.js', './js/live.js', './js/main.js', './js/manager.js', './js/names.js', './js/realdb.js', './js/realelo.js', './js/realextra.js', './js/realglobes.js', './js/realmedals.js', './js/realpodium.js', './js/realstaff.js', './js/realtitles.js', './js/sim.js', './js/traits.js', './js/ui.js', './js/update.js', './js/util.js', './js/version.js', './js/world.js'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
 });

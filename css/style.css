@@ -345,3 +345,11 @@ tr.perrow td { background: #0f1a26; color: var(--accent); font-size: 11px; font-
 #sidebar { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
 #main { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 #modal { padding-top: calc(40px + env(safe-area-inset-top)); padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+/* edytor nazwisk */
+.nm-table { table-layout: fixed; border-collapse: collapse; }
+.nm-table td { padding: 3px 4px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+.nm-table input[type=text] { width: 100%; min-width: 0; box-sizing: border-box; }
+.nm-table .nm-c-fl { width: 34px; } .nm-table .nm-c-kind { width: 26%; } .nm-table .nm-c-x { width: 44px; }
+@media (max-width: 560px) { .nm-table .nm-c-kind { width: 0; } .nm-table .nm-kind { visibility: hidden; padding: 0; font-size: 0; } }
+.nm-table tr.nm-changed input[type=text] { border-color: var(--accent, #4aa3ff); }
